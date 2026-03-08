@@ -266,7 +266,7 @@ class MacroSentimentEngineTests(unittest.TestCase):
         )
         self.assertEqual(
             macro_sentiment_engine.DEFAULT_STATE_DB_PATH,
-            Path("/Users/crenshaw/Projects/macro-sentiment-engine/db/macro_sentiment_engine.db"),
+            macro_sentiment_engine.ROOT_DIR / "db" / "macro_sentiment_engine.db",
         )
 
         with self.assertRaises(SystemExit):
