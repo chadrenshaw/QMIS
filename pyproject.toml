@@ -9,5 +9,6 @@ dependencies = [
     "pandas>=3.0.1",
     "requests>=2.32.5",
     "rich>=14.3.3",
+    "scipy>=1.16.2",
     "yfinance>=1.2.0",
 ]
