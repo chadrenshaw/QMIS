@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from qmis.alerts.engine import load_alert_snapshot
 from qmis.config import load_config
-from qmis.dashboard.cli import load_dashboard_snapshot
+from qmis.dashboard.cli import load_dashboard_snapshot, _parse_metadata
 from qmis.schema import bootstrap_database
 from qmis.signals.anomalies import detect_relationship_anomalies
 from qmis.storage import connect_db, get_default_db_path
@@ -66,7 +66,7 @@ def _fetch_latest_regime(db_path: Path) -> dict[str, Any] | None:
     with connect_db(db_path, read_only=True) as connection:
         rows = connection.execute(
             """
-            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence
+            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence, regime_probabilities, regime_drivers
             FROM regimes
             ORDER BY ts DESC
             LIMIT 1
@@ -76,6 +76,8 @@ def _fetch_latest_regime(db_path: Path) -> dict[str, Any] | None:
     if rows.empty:
         return None
     row = rows.iloc[0].to_dict()
+    row["regime_probabilities"] = _parse_metadata(row.get("regime_probabilities"))
+    row["regime_drivers"] = _parse_metadata(row.get("regime_drivers"))
     return _serialize_record(row)
 
 

@@ -95,6 +95,21 @@ class QMISDashboardCLITests(unittest.TestCase):
                     "risk_score": 2,
                     "regime_label": "STAGFLATION RISK",
                     "confidence": 0.82,
+                    "regime_probabilities": json.dumps(
+                        {
+                            "LIQUIDITY WITHDRAWAL": 34.0,
+                            "RECESSION RISK": 28.0,
+                            "INFLATIONARY EXPANSION": 16.0,
+                            "CRISIS / RISK-OFF": 12.0,
+                            "NEUTRAL": 10.0,
+                        }
+                    ),
+                    "regime_drivers": json.dumps(
+                        {
+                            "LIQUIDITY WITHDRAWAL": ["tightening liquidity factor", "mixed growth"],
+                            "RECESSION RISK": ["soft growth score", "elevated volatility"],
+                        }
+                    ),
                 }
             ]
         )
@@ -343,6 +358,7 @@ class QMISDashboardCLITests(unittest.TestCase):
             snapshot = load_dashboard_snapshot(db_path=db_path)
 
         self.assertEqual(snapshot["regime"]["regime_label"], "STAGFLATION RISK")
+        self.assertEqual(snapshot["regime"]["regime_probabilities"]["LIQUIDITY WITHDRAWAL"], 34.0)
         self.assertEqual(snapshot["scores"]["inflation_score"], 3)
         self.assertAlmostEqual(snapshot["yield_curve"], 0.4, places=6)
         self.assertEqual(snapshot["yield_curve_state"], "NORMAL")
@@ -371,6 +387,7 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertEqual(snapshot["intelligence"]["market_stress"]["stress_level"], "HIGH")
         self.assertEqual(snapshot["intelligence"]["breadth_health"]["breadth_state"], "STRONG")
         self.assertEqual(snapshot["intelligence"]["liquidity_environment"]["liquidity_state"], "EXPANDING")
+        self.assertEqual(snapshot["intelligence"]["regime_probabilities"][0]["label"], "LIQUIDITY WITHDRAWAL")
         self.assertEqual(snapshot["intelligence"]["relationship_shifts"][0]["title"], "Crypto vs Macro Decoupling")
         self.assertEqual(snapshot["intelligence"]["risk_monitor"]["breadth_risk"]["level"], "LOW")
         self.assertEqual(snapshot["intelligence"]["risk_monitor"]["systemic_risk"]["level"], "HIGH")
@@ -400,6 +417,8 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertIn("Solar: ELEVATED", output)
         self.assertIn("MARKET STRESS", output)
         self.assertIn("HIGH", output)
+        self.assertIn("REGIME PROBABILITIES", output)
+        self.assertIn("LIQUIDITY WITHDRAWAL", output)
         self.assertIn("BREADTH HEALTH", output)
         self.assertIn("STRONG", output)
         self.assertIn("LIQUIDITY ENVIRONMENT", output)

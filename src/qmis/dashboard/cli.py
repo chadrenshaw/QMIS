@@ -183,7 +183,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         ).fetchdf()
         regime_rows = connection.execute(
             """
-            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence
+            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence, regime_probabilities, regime_drivers
             FROM regimes
             ORDER BY ts DESC
             LIMIT 1
@@ -247,7 +247,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         ).fetchdf()
         score_history_rows = connection.execute(
             """
-            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence
+            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence, regime_probabilities, regime_drivers
             FROM regimes
             ORDER BY ts ASC
             """
@@ -322,6 +322,9 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
     )
 
     latest_regime = regime_rows.iloc[0].to_dict() if not regime_rows.empty else None
+    if latest_regime:
+        latest_regime["regime_probabilities"] = _parse_metadata(latest_regime.get("regime_probabilities"))
+        latest_regime["regime_drivers"] = _parse_metadata(latest_regime.get("regime_drivers"))
     scores = (
         {
             "inflation_score": int(latest_regime["inflation_score"]),
@@ -366,6 +369,8 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
             "risk_score": int(row["risk_score"]),
             "regime_label": str(row["regime_label"]),
             "confidence": float(row["confidence"]),
+            "regime_probabilities": _parse_metadata(row.get("regime_probabilities")),
+            "regime_drivers": _parse_metadata(row.get("regime_drivers")),
         }
         for _, row in score_history_rows.iterrows()
     ]
@@ -602,6 +607,22 @@ def render_market_stress(snapshot: dict[str, Any], console: Console) -> None:
     console.print(Panel(body, title="MARKET STRESS", expand=False))
 
 
+def render_regime_probabilities(snapshot: dict[str, Any], console: Console) -> None:
+    regime = snapshot.get("regime") or {}
+    probabilities = regime.get("regime_probabilities") or {}
+    drivers = regime.get("regime_drivers") or {}
+    if not probabilities:
+        console.print(Panel("No probabilistic regime snapshot available.", title="REGIME PROBABILITIES", expand=False))
+        return
+    ordered = sorted(probabilities.items(), key=lambda item: float(item[1]), reverse=True)[:5]
+    lines = []
+    for label, probability in ordered:
+        driver_text = ", ".join(drivers.get(label, [])[:2])
+        suffix = f" | {driver_text}" if driver_text else ""
+        lines.append(f"- {label}: {float(probability):.2f}%{suffix}")
+    console.print(Panel("\n".join(lines), title="REGIME PROBABILITIES", expand=False))
+
+
 def render_breadth_health(snapshot: dict[str, Any], console: Console) -> None:
     breadth = snapshot["intelligence"].get("breadth_health")
     if not breadth:
@@ -676,6 +697,7 @@ def render_dashboard(snapshot: dict[str, Any], console: Console | None = None) -
     render_world_snapshot(snapshot, console)
     _render_market_pulse(snapshot, console)
     _render_cosmic_state(snapshot, console)
+    render_regime_probabilities(snapshot, console)
     render_market_stress(snapshot, console)
     render_breadth_health(snapshot, console)
     render_liquidity_environment(snapshot, console)

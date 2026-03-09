@@ -41,6 +41,27 @@ def _breadth_health(snapshot: dict[str, Any]) -> dict[str, Any]:
     return dict(breadth) if isinstance(breadth, dict) else {}
 
 
+def build_regime_probability_summary(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    regime = snapshot.get("regime") or {}
+    probabilities = regime.get("regime_probabilities") or {}
+    drivers = regime.get("regime_drivers") or {}
+    if not isinstance(probabilities, dict):
+        return []
+    ordered = sorted(
+        ((str(label), float(probability)) for label, probability in probabilities.items()),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    return [
+        {
+            "label": label,
+            "probability": probability,
+            "drivers": list(drivers.get(label, [])) if isinstance(drivers, dict) else [],
+        }
+        for label, probability in ordered[:5]
+    ]
+
+
 def _trend(snapshot: dict[str, Any], series_name: str) -> str:
     trend_label = snapshot.get("trend_summary", {}).get(series_name, {}).get("trend_label")
     return str(trend_label) if trend_label is not None else "N/A"
@@ -718,6 +739,7 @@ def build_operator_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "market_stress": snapshot.get("market_stress"),
         "breadth_health": snapshot.get("breadth_health"),
         "liquidity_environment": snapshot.get("liquidity_environment"),
+        "regime_probabilities": build_regime_probability_summary(snapshot),
         "market_drivers": build_market_drivers(snapshot),
         "relationship_shifts": relationship_changes,
         "risk_monitor": risk_monitor,

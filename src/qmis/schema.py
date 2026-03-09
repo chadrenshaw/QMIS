@@ -96,7 +96,9 @@ SCHEMA_STATEMENTS = (
         liquidity_score INTEGER,
         risk_score INTEGER,
         regime_label TEXT,
-        confidence DOUBLE
+        confidence DOUBLE,
+        regime_probabilities JSON,
+        regime_drivers JSON
     )
     """,
     """
@@ -138,6 +140,8 @@ SCHEMA_MIGRATIONS = (
     "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS series_x TEXT",
     "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS series_y TEXT",
     "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS metadata JSON",
+    "ALTER TABLE regimes ADD COLUMN IF NOT EXISTS regime_probabilities JSON",
+    "ALTER TABLE regimes ADD COLUMN IF NOT EXISTS regime_drivers JSON",
 )
 
 

@@ -33,8 +33,28 @@ class QMISAlertEngineTests(unittest.TestCase):
         )
         regimes = pd.DataFrame(
             [
-                {"ts": ts_prev, "inflation_score": 2, "growth_score": 2, "liquidity_score": 2, "risk_score": 1, "regime_label": "INFLATIONARY EXPANSION", "confidence": 0.74},
-                {"ts": ts, "inflation_score": 3, "growth_score": 1, "liquidity_score": 2, "risk_score": 3, "regime_label": "CRISIS / RISK-OFF", "confidence": 0.9},
+                {
+                    "ts": ts_prev,
+                    "inflation_score": 2,
+                    "growth_score": 2,
+                    "liquidity_score": 2,
+                    "risk_score": 1,
+                    "regime_label": "INFLATIONARY EXPANSION",
+                    "confidence": 0.74,
+                    "regime_probabilities": '{"INFLATIONARY EXPANSION": 58.0, "LIQUIDITY EXPANSION": 22.0, "NEUTRAL": 20.0}',
+                    "regime_drivers": '{"INFLATIONARY EXPANSION": ["growth and inflation both firm"]}',
+                },
+                {
+                    "ts": ts,
+                    "inflation_score": 3,
+                    "growth_score": 1,
+                    "liquidity_score": 2,
+                    "risk_score": 3,
+                    "regime_label": "CRISIS / RISK-OFF",
+                    "confidence": 0.9,
+                    "regime_probabilities": '{"CRISIS / RISK-OFF": 47.0, "RECESSION RISK": 26.0, "LIQUIDITY WITHDRAWAL": 17.0, "NEUTRAL": 10.0}',
+                    "regime_drivers": '{"CRISIS / RISK-OFF": ["risk elevated", "growth deteriorating"]}',
+                },
             ]
         )
         relationships = pd.DataFrame(

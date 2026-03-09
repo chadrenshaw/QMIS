@@ -186,6 +186,8 @@ class QMISSchemaTests(unittest.TestCase):
                 "risk_score",
                 "regime_label",
                 "confidence",
+                "regime_probabilities",
+                "regime_drivers",
             },
         )
         self.assertEqual(

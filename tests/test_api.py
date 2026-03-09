@@ -67,6 +67,8 @@ class QMISAPITests(unittest.TestCase):
                     "risk_score": 1,
                     "regime_label": "INFLATIONARY EXPANSION",
                     "confidence": 0.76,
+                    "regime_probabilities": '{"INFLATIONARY EXPANSION": 52.0, "DISINFLATION": 18.0, "NEUTRAL": 30.0}',
+                    "regime_drivers": '{"INFLATIONARY EXPANSION": ["positive growth and liquidity"]}',
                 },
                 {
                     "ts": ts,
@@ -76,6 +78,8 @@ class QMISAPITests(unittest.TestCase):
                     "risk_score": 2,
                     "regime_label": "STAGFLATION RISK",
                     "confidence": 0.82,
+                    "regime_probabilities": '{"LIQUIDITY WITHDRAWAL": 29.0, "RECESSION RISK": 25.0, "INFLATIONARY EXPANSION": 18.0, "CRISIS / RISK-OFF": 12.0, "NEUTRAL": 16.0}',
+                    "regime_drivers": '{"LIQUIDITY WITHDRAWAL": ["liquidity tightening", "risk elevated"]}',
                 }
             ]
         )
@@ -190,6 +194,7 @@ class QMISAPITests(unittest.TestCase):
 
         self.assertEqual(regime.status_code, 200)
         self.assertEqual(regime.json()["regime_label"], "STAGFLATION RISK")
+        self.assertEqual(regime.json()["regime_probabilities"]["LIQUIDITY WITHDRAWAL"], 29.0)
 
         self.assertEqual(signals.status_code, 200)
         self.assertIn("gold", signals.json()["signals"])
@@ -211,6 +216,7 @@ class QMISAPITests(unittest.TestCase):
         self.assertIn("gold", dashboard.json()["signal_history"])
         self.assertEqual(len(dashboard.json()["signal_history"]["gold"]), 2)
         self.assertEqual(len(dashboard.json()["score_history"]), 2)
+        self.assertEqual(dashboard.json()["regime"]["regime_probabilities"]["LIQUIDITY WITHDRAWAL"], 29.0)
         self.assertEqual(dashboard.json()["alert_summary"]["status"], "active")
         self.assertGreaterEqual(len(dashboard.json()["alerts"]), 3)
         self.assertEqual(dashboard.json()["market_stress"]["stress_level"], "HIGH")

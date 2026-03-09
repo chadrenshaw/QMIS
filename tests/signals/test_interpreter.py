@@ -205,6 +205,17 @@ class OperatorInterpreterTests(unittest.TestCase):
             "regime": {
                 "regime_label": "LIQUIDITY WITHDRAWAL",
                 "confidence": 0.51,
+                "regime_probabilities": {
+                    "LIQUIDITY WITHDRAWAL": 33.0,
+                    "RECESSION RISK": 27.0,
+                    "CRISIS / RISK-OFF": 18.0,
+                    "NEUTRAL": 12.0,
+                    "INFLATIONARY EXPANSION": 10.0,
+                },
+                "regime_drivers": {
+                    "LIQUIDITY WITHDRAWAL": ["tightening liquidity", "weak growth"],
+                    "RECESSION RISK": ["soft PMI", "fragile breadth"],
+                },
             },
             "yield_curve": 0.43,
             "yield_curve_state": "NORMAL",
@@ -385,6 +396,7 @@ class OperatorInterpreterTests(unittest.TestCase):
         self.assertEqual(intelligence["market_stress"]["stress_level"], "HIGH")
         self.assertEqual(intelligence["liquidity_environment"]["liquidity_state"], "TIGHTENING")
         self.assertEqual(intelligence["breadth_health"]["breadth_state"], "FRAGILE")
+        self.assertEqual(intelligence["regime_probabilities"][0]["label"], "LIQUIDITY WITHDRAWAL")
         self.assertIn("breadth", intelligence["market_stress"]["summary"].lower())
         self.assertTrue(intelligence["experimental_signals"]["visible"])
 
