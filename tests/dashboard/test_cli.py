@@ -207,6 +207,46 @@ class QMISDashboardCLITests(unittest.TestCase):
                 }
             ]
         )
+        cycles = pd.DataFrame(
+            [
+                {
+                    "ts": ts,
+                    "cycle_name": "solar_cycle",
+                    "phase": "rising",
+                    "strength": 0.79,
+                    "is_turning_point": False,
+                    "transition_from": None,
+                    "alert_on_transition": True,
+                    "summary": "Solar activity is rising as the 90d average accelerates above the 365d baseline.",
+                    "supporting_signals": json.dumps(["sunspot_number"]),
+                    "metadata": json.dumps({"window_365d_mean": 132.0, "window_11y_range_pct": 0.63}),
+                },
+                {
+                    "ts": ts,
+                    "cycle_name": "lunar_cycle",
+                    "phase": "waning_gibbous",
+                    "strength": 0.68,
+                    "is_turning_point": False,
+                    "transition_from": None,
+                    "alert_on_transition": False,
+                    "summary": "The moon is in a waning gibbous phase.",
+                    "supporting_signals": json.dumps(["lunar_cycle_day"]),
+                    "metadata": json.dumps({"lunar_cycle_day": 20.0}),
+                },
+                {
+                    "ts": ts,
+                    "cycle_name": "macro_liquidity_cycle",
+                    "phase": "expanding",
+                    "strength": 0.73,
+                    "is_turning_point": False,
+                    "transition_from": "minimum",
+                    "alert_on_transition": True,
+                    "summary": "Macro liquidity is in an expanding phase as balance-sheet support improves and restrictive inputs ease.",
+                    "supporting_signals": json.dumps(["fed_balance_sheet", "reverse_repo_usage", "real_yields"]),
+                    "metadata": json.dumps({"liquidity_state": "EXPANDING"}),
+                },
+            ]
+        )
         relationships = pd.DataFrame(
             [
                 {
@@ -350,6 +390,7 @@ class QMISDashboardCLITests(unittest.TestCase):
                 ("features", features),
                 ("factors", factors),
                 ("stress_snapshots", stress),
+                ("cycle_snapshots", cycles),
                 ("breadth_snapshots", breadth_health),
                 ("liquidity_snapshots", liquidity_environment),
                 ("regimes", regimes),
@@ -390,6 +431,8 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertEqual(snapshot["factors"][0]["direction"], "tightening")
         self.assertIn(False, [bool(row["passes_filter"]) for row in snapshot["factors"]])
         self.assertEqual(snapshot["market_stress"]["stress_level"], "HIGH")
+        self.assertEqual(snapshot["cycles"][0]["cycle_name"], "solar_cycle")
+        self.assertEqual(snapshot["cycles"][1]["phase"], "waning_gibbous")
         self.assertEqual(snapshot["market_stress"]["missing_inputs"], ["credit"])
         self.assertEqual(snapshot["breadth_health"]["breadth_state"], "STRONG")
         self.assertEqual(snapshot["liquidity_environment"]["liquidity_state"], "EXPANDING")
@@ -402,6 +445,8 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertEqual(snapshot["intelligence"]["market_stress"]["stress_level"], "HIGH")
         self.assertEqual(snapshot["intelligence"]["breadth_health"]["breadth_state"], "STRONG")
         self.assertEqual(snapshot["intelligence"]["liquidity_environment"]["liquidity_state"], "EXPANDING")
+        self.assertEqual(snapshot["intelligence"]["cycle_monitor"][0]["label"], "Solar Cycle Phase")
+        self.assertEqual(snapshot["intelligence"]["cycle_monitor"][2]["phase"], "Expanding")
         self.assertEqual(snapshot["intelligence"]["regime_probabilities"][0]["label"], "LIQUIDITY WITHDRAWAL")
         self.assertEqual(snapshot["intelligence"]["divergences"][0]["title"], "Gold Rising With Yields")
         self.assertIn("gold", snapshot["intelligence"]["market_narrative"]["text"].lower())
@@ -444,6 +489,9 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertIn("STRONG", output)
         self.assertIn("LIQUIDITY ENVIRONMENT", output)
         self.assertIn("EXPANDING", output)
+        self.assertIn("CYCLE MONITOR", output)
+        self.assertIn("Solar Cycle Phase", output)
+        self.assertIn("Macro Liquidity Cycle Phase", output)
         self.assertIn("MARKET NARRATIVE", output)
         self.assertIn("Gold Rising With Yields", output)
         self.assertIn("PRIMARY MARKET DRIVERS", output)

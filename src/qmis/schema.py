@@ -66,6 +66,20 @@ SCHEMA_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS cycle_snapshots (
+        ts TIMESTAMP,
+        cycle_name TEXT,
+        phase TEXT,
+        strength DOUBLE,
+        is_turning_point BOOLEAN,
+        transition_from TEXT,
+        alert_on_transition BOOLEAN,
+        summary TEXT,
+        supporting_signals JSON,
+        metadata JSON
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS liquidity_snapshots (
         ts TIMESTAMP,
         liquidity_score DOUBLE,

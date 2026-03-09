@@ -37,6 +37,7 @@ class QMISSchemaTests(unittest.TestCase):
                 "factors",
                 "features",
                 "breadth_snapshots",
+                "cycle_snapshots",
                 "liquidity_snapshots",
                 "regimes",
                 "relationships",
@@ -73,6 +74,10 @@ class QMISSchemaTests(unittest.TestCase):
                 breadth_columns = {
                     row[1]
                     for row in connection.execute("PRAGMA table_info('breadth_snapshots')").fetchall()
+                }
+                cycle_columns = {
+                    row[1]
+                    for row in connection.execute("PRAGMA table_info('cycle_snapshots')").fetchall()
                 }
                 liquidity_columns = {
                     row[1]
@@ -149,6 +154,21 @@ class QMISSchemaTests(unittest.TestCase):
                 "summary",
                 "components",
                 "missing_inputs",
+            },
+        )
+        self.assertEqual(
+            cycle_columns,
+            {
+                "ts",
+                "cycle_name",
+                "phase",
+                "strength",
+                "is_turning_point",
+                "transition_from",
+                "alert_on_transition",
+                "summary",
+                "supporting_signals",
+                "metadata",
             },
         )
         self.assertEqual(

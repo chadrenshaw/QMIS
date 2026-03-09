@@ -443,6 +443,27 @@ def build_market_pulse(snapshot: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
+def build_cycle_monitor(snapshot: dict[str, Any]) -> list[dict[str, str]]:
+    cycle_rows = snapshot.get("cycles") or []
+    if not isinstance(cycle_rows, list):
+        return []
+
+    cycle_map = {str(row.get("cycle_name")): dict(row) for row in cycle_rows if isinstance(row, dict)}
+    results = []
+    for cycle_name, label in (
+        ("solar_cycle", "Solar Cycle Phase"),
+        ("lunar_cycle", "Lunar Cycle Phase"),
+        ("macro_liquidity_cycle", "Macro Liquidity Cycle Phase"),
+    ):
+        row = cycle_map.get(cycle_name, {})
+        phase = str(row.get("phase") or "unknown").replace("_", " ").title()
+        summary = str(row.get("summary") or "No cycle snapshot available.")
+        if row.get("is_turning_point"):
+            summary = f"Turning point | {summary}"
+        results.append({"label": label, "phase": phase, "summary": summary})
+    return results
+
+
 def build_cosmic_state_line(snapshot: dict[str, Any], world_state: dict[str, Any] | None = None) -> str:
     state = world_state or interpret_world_state(snapshot)
     lunar_cycle_day = state.get("lunar_cycle_day")
@@ -788,6 +809,7 @@ def build_operator_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     return {
         "global_state_line": build_global_state_line(snapshot),
         "market_pulse": build_market_pulse(snapshot),
+        "cycle_monitor": build_cycle_monitor(snapshot),
         "cosmic_state_line": build_cosmic_state_line(snapshot, world_state),
         "market_narrative": build_market_narrative(snapshot),
         "market_stress": snapshot.get("market_stress"),

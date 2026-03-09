@@ -207,26 +207,31 @@ def build_cycle_alerts(cycles: pd.DataFrame) -> list[dict[str, Any]]:
 
     alerts: list[dict[str, Any]] = []
     for row in cycles.itertuples(index=False):
-        if not row.matched_cycle or str(row.confidence_label) == "likely_spurious":
+        previous_phase = getattr(row, "transition_from", None)
+        if not bool(getattr(row, "alert_on_transition", False)):
+            continue
+        if previous_phase is None or str(previous_phase) == str(row.phase):
             continue
         alerts.append(
             _record(
-                ts=pd.Timestamp.now(tz="UTC").tz_localize(None),
-                alert_type="cycle_match",
-                severity=_severity_for_confidence(str(row.confidence_label)),
-                rule_key="cycle_match",
-                dedupe_key=f"cycle:{row.series_name}:{row.matched_cycle}",
-                title="Periodicity detected",
+                ts=row.ts,
+                alert_type="cycle_phase_transition",
+                severity="warning" if bool(getattr(row, "is_turning_point", False)) else "info",
+                rule_key="cycle_phase_transition",
+                dedupe_key=f"cycle_transition:{row.cycle_name}:{previous_phase}->{row.phase}",
+                title="Cycle phase transition",
                 message=(
-                    f"{row.series_name} dominant cycle {float(row.period_days):.1f} days "
-                    f"matches {row.matched_cycle}."
+                    f"{str(row.cycle_name).replace('_', ' ').title()} moved from "
+                    f"{str(previous_phase).replace('_', ' ')} to {str(row.phase).replace('_', ' ')}."
                 ),
-                source_table="signals",
-                series_name=str(row.series_name),
+                source_table="cycle_snapshots",
+                series_name=str(row.cycle_name),
                 metadata={
-                    "period_days": float(row.period_days),
-                    "matched_cycle": str(row.matched_cycle),
-                    "confidence_label": str(row.confidence_label),
+                    "cycle_name": str(row.cycle_name),
+                    "previous_phase": str(previous_phase),
+                    "current_phase": str(row.phase),
+                    "is_turning_point": bool(getattr(row, "is_turning_point", False)),
+                    "summary": str(getattr(row, "summary", "")),
                 },
             )
         )

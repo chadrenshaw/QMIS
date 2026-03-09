@@ -211,6 +211,7 @@ def create_app(db_path: Path | None = None, web_dist_dir: Path | None = None) ->
             "score_history": [_serialize_record(point) for point in snapshot["score_history"]],
             "regime": _serialize_record(snapshot["regime"]) if snapshot["regime"] else None,
             "market_stress": _serialize_record(snapshot["market_stress"]) if snapshot["market_stress"] else None,
+            "cycles": [_serialize_record(row) for row in snapshot["cycles"]],
             "breadth_health": _serialize_record(snapshot["breadth_health"]) if snapshot["breadth_health"] else None,
             "liquidity_environment": _serialize_record(snapshot["liquidity_environment"]) if snapshot["liquidity_environment"] else None,
             "yield_curve": snapshot["yield_curve"],

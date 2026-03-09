@@ -168,12 +168,53 @@ class QMISAPITests(unittest.TestCase):
                 }
             ]
         )
+        cycles = pd.DataFrame(
+            [
+                {
+                    "ts": ts,
+                    "cycle_name": "solar_cycle",
+                    "phase": "rising",
+                    "strength": 0.82,
+                    "is_turning_point": False,
+                    "transition_from": None,
+                    "alert_on_transition": True,
+                    "summary": "Solar activity is rising as the 90d average trends above the long-run baseline.",
+                    "supporting_signals": '["sunspot_number"]',
+                    "metadata": '{"window_365d_mean": 141.0}',
+                },
+                {
+                    "ts": ts,
+                    "cycle_name": "lunar_cycle",
+                    "phase": "waning_gibbous",
+                    "strength": 0.68,
+                    "is_turning_point": False,
+                    "transition_from": None,
+                    "alert_on_transition": False,
+                    "summary": "The moon is in a waning gibbous phase.",
+                    "supporting_signals": '["lunar_cycle_day"]',
+                    "metadata": '{"lunar_cycle_day": 20.0}',
+                },
+                {
+                    "ts": ts,
+                    "cycle_name": "macro_liquidity_cycle",
+                    "phase": "neutral",
+                    "strength": 0.55,
+                    "is_turning_point": False,
+                    "transition_from": "contracting",
+                    "alert_on_transition": True,
+                    "summary": "Macro liquidity is stabilizing after a contracting phase.",
+                    "supporting_signals": '["fed_balance_sheet", "real_yields"]',
+                    "metadata": '{"liquidity_state": "NEUTRAL"}',
+                },
+            ]
+        )
 
         with connect_db(db_path) as connection:
             for table_name, payload in (
                 ("signals", signals),
                 ("features", features),
                 ("stress_snapshots", stress),
+                ("cycle_snapshots", cycles),
                 ("breadth_snapshots", breadth_health),
                 ("liquidity_snapshots", liquidity_environment),
                 ("regimes", regimes),
@@ -238,6 +279,8 @@ class QMISAPITests(unittest.TestCase):
         self.assertEqual(dashboard.json()["alert_summary"]["status"], "active")
         self.assertGreaterEqual(len(dashboard.json()["alerts"]), 3)
         self.assertEqual(dashboard.json()["market_stress"]["stress_level"], "HIGH")
+        self.assertEqual(dashboard.json()["cycles"][0]["cycle_name"], "solar_cycle")
+        self.assertEqual(dashboard.json()["cycles"][2]["phase"], "neutral")
         self.assertEqual(dashboard.json()["market_stress"]["missing_inputs"], ["credit"])
         self.assertEqual(dashboard.json()["breadth_health"]["breadth_state"], "WEAKENING")
         self.assertEqual(dashboard.json()["liquidity_environment"]["liquidity_state"], "NEUTRAL")

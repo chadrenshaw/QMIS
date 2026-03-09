@@ -338,6 +338,41 @@ class OperatorInterpreterTests(unittest.TestCase):
                 },
                 "missing_inputs": [],
             },
+            "cycles": [
+                {
+                    "cycle_name": "solar_cycle",
+                    "phase": "peak",
+                    "strength": 0.86,
+                    "is_turning_point": True,
+                    "transition_from": "rising",
+                    "alert_on_transition": True,
+                    "summary": "Solar activity reached a local peak after a sustained rise in the 90d average.",
+                    "supporting_signals": ["sunspot_number"],
+                    "metadata": {"window_365d_mean": 155.2},
+                },
+                {
+                    "cycle_name": "lunar_cycle",
+                    "phase": "waning_gibbous",
+                    "strength": 0.68,
+                    "is_turning_point": False,
+                    "transition_from": None,
+                    "alert_on_transition": False,
+                    "summary": "The moon is in a waning gibbous phase.",
+                    "supporting_signals": ["lunar_cycle_day"],
+                    "metadata": {"lunar_cycle_day": 20.0},
+                },
+                {
+                    "cycle_name": "macro_liquidity_cycle",
+                    "phase": "contracting",
+                    "strength": 0.77,
+                    "is_turning_point": False,
+                    "transition_from": "peak",
+                    "alert_on_transition": True,
+                    "summary": "Macro liquidity remains in a contracting phase as restrictive conditions persist.",
+                    "supporting_signals": ["fed_balance_sheet", "real_yields", "dollar_index"],
+                    "metadata": {"liquidity_state": "TIGHTENING"},
+                },
+            ],
             "anomalies": [
                 {
                     "series_x": "BTCUSD",
@@ -418,6 +453,8 @@ class OperatorInterpreterTests(unittest.TestCase):
         self.assertEqual(intelligence["market_stress"]["stress_level"], "HIGH")
         self.assertEqual(intelligence["liquidity_environment"]["liquidity_state"], "TIGHTENING")
         self.assertEqual(intelligence["breadth_health"]["breadth_state"], "FRAGILE")
+        self.assertEqual(intelligence["cycle_monitor"][0]["label"], "Solar Cycle Phase")
+        self.assertEqual(intelligence["cycle_monitor"][0]["phase"], "Peak")
         self.assertEqual(intelligence["regime_probabilities"][0]["label"], "LIQUIDITY WITHDRAWAL")
         self.assertIn("breadth", intelligence["market_stress"]["summary"].lower())
         self.assertTrue(intelligence["experimental_signals"]["visible"])
@@ -434,6 +471,7 @@ class OperatorInterpreterTests(unittest.TestCase):
         self.assertEqual(len(intelligence["market_drivers"]), 2)
         self.assertEqual(intelligence["market_drivers"][0]["title"], "Liquidity Tightening")
         self.assertEqual(intelligence["market_drivers"][1]["title"], "Crypto Cycle")
+        self.assertEqual(intelligence["cycle_monitor"][2]["phase"], "Contracting")
         self.assertEqual(intelligence["relationship_shifts"][0]["title"], "Crypto vs Macro Decoupling")
         self.assertEqual(len(intelligence["warning_signals"]), 3)
         self.assertIn("crypto decoupling from liquidity", " ".join(item["title"].lower() for item in intelligence["warning_signals"]))

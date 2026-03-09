@@ -109,6 +109,7 @@ def _build_freshness(
     latest_liquidity_ts: Any,
     latest_relationship_ts: Any,
     latest_stress_ts: Any,
+    latest_cycle_ts: Any,
 ) -> dict[str, Any]:
     timestamps = [
         ts for ts in (
@@ -118,6 +119,7 @@ def _build_freshness(
             _coerce_timestamp(latest_liquidity_ts),
             _coerce_timestamp(latest_relationship_ts),
             _coerce_timestamp(latest_stress_ts),
+            _coerce_timestamp(latest_cycle_ts),
         )
         if ts is not None
     ]
@@ -130,6 +132,7 @@ def _build_freshness(
             "latest_liquidity_ts": latest_liquidity_ts,
             "latest_relationship_ts": latest_relationship_ts,
             "latest_stress_ts": latest_stress_ts,
+            "latest_cycle_ts": latest_cycle_ts,
         }
 
     newest = max(timestamps)
@@ -143,6 +146,7 @@ def _build_freshness(
         "latest_liquidity_ts": latest_liquidity_ts,
         "latest_relationship_ts": latest_relationship_ts,
         "latest_stress_ts": latest_stress_ts,
+        "latest_cycle_ts": latest_cycle_ts,
         "age_days": age_days,
     }
 
@@ -220,6 +224,21 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
             FROM liquidity_snapshots
             ORDER BY ts DESC
             LIMIT 1
+            """
+        ).fetchdf()
+        cycle_rows = connection.execute(
+            """
+            SELECT ts, cycle_name, phase, strength, is_turning_point, transition_from,
+                   alert_on_transition, summary, supporting_signals, metadata
+            FROM cycle_snapshots
+            ORDER BY
+                CASE cycle_name
+                    WHEN 'solar_cycle' THEN 0
+                    WHEN 'lunar_cycle' THEN 1
+                    WHEN 'macro_liquidity_cycle' THEN 2
+                    ELSE 99
+                END,
+                cycle_name ASC
             """
         ).fetchdf()
         relationship_rows = connection.execute(
@@ -323,6 +342,21 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         if not liquidity_rows.empty
         else None
     )
+    cycles = [
+        {
+            "ts": row["ts"],
+            "cycle_name": str(row["cycle_name"]),
+            "phase": str(row["phase"]),
+            "strength": float(row["strength"]),
+            "is_turning_point": bool(row["is_turning_point"]),
+            "transition_from": str(row["transition_from"]) if row["transition_from"] is not None else None,
+            "alert_on_transition": bool(row["alert_on_transition"]),
+            "summary": str(row["summary"]),
+            "supporting_signals": _parse_json_list(row["supporting_signals"]),
+            "metadata": _parse_metadata(row["metadata"]),
+        }
+        for _, row in cycle_rows.iterrows()
+    ]
 
     latest_regime = regime_rows.iloc[0].to_dict() if not regime_rows.empty else None
     if latest_regime:
@@ -409,6 +443,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         latest_liquidity_ts=liquidity_rows["ts"].max() if not liquidity_rows.empty else None,
         latest_relationship_ts=relationship_rows["ts"].max() if not relationship_rows.empty else None,
         latest_stress_ts=stress_rows["ts"].max() if not stress_rows.empty else None,
+        latest_cycle_ts=cycle_rows["ts"].max() if not cycle_rows.empty else None,
     )
     latest_snapshot_ts = max(
         (
@@ -420,6 +455,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
                 liquidity_rows["ts"].max() if not liquidity_rows.empty else None,
                 relationship_rows["ts"].max() if not relationship_rows.empty else None,
                 stress_rows["ts"].max() if not stress_rows.empty else None,
+                cycle_rows["ts"].max() if not cycle_rows.empty else None,
             )
             if ts is not None
         ),
@@ -438,6 +474,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         "regime": latest_regime,
         "factors": factors,
         "market_stress": market_stress,
+        "cycles": cycles,
         "breadth_health": breadth_health,
         "liquidity_environment": liquidity_environment,
         "yield_curve": yield_curve,
@@ -618,6 +655,15 @@ def render_market_stress(snapshot: dict[str, Any], console: Console) -> None:
     console.print(Panel(body, title="MARKET STRESS", expand=False))
 
 
+def render_cycle_monitor(snapshot: dict[str, Any], console: Console) -> None:
+    rows = snapshot["intelligence"].get("cycle_monitor", [])
+    if not rows:
+        console.print(Panel("No cycle snapshots available.", title="CYCLE MONITOR", expand=False))
+        return
+    body = "\n".join(f"- {row['label']}: {row['phase']} | {row['summary']}" for row in rows)
+    console.print(Panel(body, title="CYCLE MONITOR", expand=False))
+
+
 def render_regime_probabilities(snapshot: dict[str, Any], console: Console) -> None:
     regime = snapshot.get("regime") or {}
     probabilities = regime.get("regime_probabilities") or {}
@@ -720,6 +766,7 @@ def render_dashboard(snapshot: dict[str, Any], console: Console | None = None) -
     render_market_narrative(snapshot, console)
     render_regime_probabilities(snapshot, console)
     render_market_stress(snapshot, console)
+    render_cycle_monitor(snapshot, console)
     render_breadth_health(snapshot, console)
     render_liquidity_environment(snapshot, console)
     render_market_forces(snapshot, console)

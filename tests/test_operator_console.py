@@ -2,6 +2,7 @@ import io
 import sys
 import tempfile
 import unittest
+from contextlib import ExitStack
 from datetime import UTC, datetime
 from pathlib import Path
 from unittest import mock
@@ -56,29 +57,29 @@ class QMISOperatorConsoleTests(unittest.TestCase):
             "alerts": [],
         }
 
-        with (
-            mock.patch.object(run_operator_console, "_latest_collector_run_timestamp", return_value=None),
-            mock.patch.object(run_operator_console, "_latest_signal_timestamp", return_value=None),
-            mock.patch.object(run_operator_console, "run_market_collector", return_value=2) as market,
-            mock.patch.object(run_operator_console, "run_crypto_collector", return_value=3) as crypto,
-            mock.patch.object(run_operator_console, "run_breadth_collector", return_value=1) as breadth,
-            mock.patch.object(run_operator_console, "run_macro_collector", return_value=4) as macro,
-            mock.patch.object(run_operator_console, "run_liquidity_collector", return_value=2) as liquidity,
-            mock.patch.object(run_operator_console, "run_solar_collector", return_value=2) as solar,
-            mock.patch.object(run_operator_console, "run_astronomy_collector", return_value=2) as astronomy,
-            mock.patch.object(run_operator_console, "run_natural_collector", return_value=2) as natural,
-            mock.patch.object(run_operator_console, "materialize_features", return_value=12) as features,
-            mock.patch.object(run_operator_console, "materialize_regime", return_value=1) as regime,
-            mock.patch.object(run_operator_console, "materialize_breadth_health", return_value=1) as breadth_health,
-            mock.patch.object(run_operator_console, "materialize_liquidity_state", return_value=1) as liquidity_state,
-            mock.patch.object(run_operator_console, "materialize_factors", return_value=3) as factors,
-            mock.patch.object(run_operator_console, "materialize_relationships", return_value=5) as relationships,
-            mock.patch.object(run_operator_console, "materialize_market_stress", return_value=1) as stress,
-            mock.patch.object(run_operator_console, "materialize_lead_lag_relationships", return_value=2) as lead_lag,
-            mock.patch.object(run_operator_console, "materialize_alerts", return_value=3) as alerts,
-            mock.patch.object(run_operator_console, "load_dashboard_snapshot", return_value=snapshot) as load_snapshot,
-            mock.patch.object(run_operator_console, "render_dashboard") as render_dashboard,
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(run_operator_console, "_latest_collector_run_timestamp", return_value=None))
+            stack.enter_context(mock.patch.object(run_operator_console, "_latest_signal_timestamp", return_value=None))
+            market = stack.enter_context(mock.patch.object(run_operator_console, "run_market_collector", return_value=2))
+            crypto = stack.enter_context(mock.patch.object(run_operator_console, "run_crypto_collector", return_value=3))
+            breadth = stack.enter_context(mock.patch.object(run_operator_console, "run_breadth_collector", return_value=1))
+            macro = stack.enter_context(mock.patch.object(run_operator_console, "run_macro_collector", return_value=4))
+            liquidity = stack.enter_context(mock.patch.object(run_operator_console, "run_liquidity_collector", return_value=2))
+            solar = stack.enter_context(mock.patch.object(run_operator_console, "run_solar_collector", return_value=2))
+            astronomy = stack.enter_context(mock.patch.object(run_operator_console, "run_astronomy_collector", return_value=2))
+            natural = stack.enter_context(mock.patch.object(run_operator_console, "run_natural_collector", return_value=2))
+            features = stack.enter_context(mock.patch.object(run_operator_console, "materialize_features", return_value=12))
+            regime = stack.enter_context(mock.patch.object(run_operator_console, "materialize_regime", return_value=1))
+            breadth_health = stack.enter_context(mock.patch.object(run_operator_console, "materialize_breadth_health", return_value=1))
+            liquidity_state = stack.enter_context(mock.patch.object(run_operator_console, "materialize_liquidity_state", return_value=1))
+            factors = stack.enter_context(mock.patch.object(run_operator_console, "materialize_factors", return_value=3))
+            relationships = stack.enter_context(mock.patch.object(run_operator_console, "materialize_relationships", return_value=5))
+            stress = stack.enter_context(mock.patch.object(run_operator_console, "materialize_market_stress", return_value=1))
+            cycles = stack.enter_context(mock.patch.object(run_operator_console, "materialize_cycle_snapshots", return_value=3))
+            lead_lag = stack.enter_context(mock.patch.object(run_operator_console, "materialize_lead_lag_relationships", return_value=2))
+            alerts = stack.enter_context(mock.patch.object(run_operator_console, "materialize_alerts", return_value=3))
+            load_snapshot = stack.enter_context(mock.patch.object(run_operator_console, "load_dashboard_snapshot", return_value=snapshot))
+            render_dashboard = stack.enter_context(mock.patch.object(run_operator_console, "render_dashboard"))
             console = Console(file=io.StringIO(), force_terminal=False, color_system=None, width=120)
             exit_code = run_operator_console.main(["--force-refresh"], console=console)
 
@@ -99,6 +100,7 @@ class QMISOperatorConsoleTests(unittest.TestCase):
             factors,
             relationships,
             stress,
+            cycles,
             lead_lag,
             alerts,
             load_snapshot,
@@ -185,26 +187,28 @@ class QMISOperatorConsoleTests(unittest.TestCase):
             },
         )
 
-        with (
-            mock.patch.object(run_operator_console, "_collector_specs", return_value=specs),
-            mock.patch.object(run_operator_console, "_latest_collector_run_timestamp", return_value=None),
-            mock.patch.object(
-                run_operator_console,
-                "_latest_signal_timestamp",
-                side_effect=[pd.Timestamp.now("UTC"), pd.Timestamp.now("UTC") - pd.Timedelta(days=2)],
-            ),
-            mock.patch.object(run_operator_console, "materialize_features", return_value=12),
-            mock.patch.object(run_operator_console, "materialize_regime", return_value=1),
-            mock.patch.object(run_operator_console, "materialize_breadth_health", return_value=1),
-            mock.patch.object(run_operator_console, "materialize_liquidity_state", return_value=1),
-            mock.patch.object(run_operator_console, "materialize_factors", return_value=4),
-            mock.patch.object(run_operator_console, "materialize_relationships", return_value=5),
-            mock.patch.object(run_operator_console, "materialize_market_stress", return_value=1),
-            mock.patch.object(run_operator_console, "materialize_lead_lag_relationships", return_value=2),
-            mock.patch.object(run_operator_console, "materialize_alerts", return_value=3),
-            mock.patch.object(run_operator_console, "load_dashboard_snapshot", return_value=snapshot),
-            mock.patch.object(run_operator_console, "render_dashboard"),
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(run_operator_console, "_collector_specs", return_value=specs))
+            stack.enter_context(mock.patch.object(run_operator_console, "_latest_collector_run_timestamp", return_value=None))
+            stack.enter_context(
+                mock.patch.object(
+                    run_operator_console,
+                    "_latest_signal_timestamp",
+                    side_effect=[pd.Timestamp.now("UTC"), pd.Timestamp.now("UTC") - pd.Timedelta(days=2)],
+                )
+            )
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_features", return_value=12))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_regime", return_value=1))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_breadth_health", return_value=1))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_liquidity_state", return_value=1))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_factors", return_value=4))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_relationships", return_value=5))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_market_stress", return_value=1))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_cycle_snapshots", return_value=3))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_lead_lag_relationships", return_value=2))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_alerts", return_value=3))
+            stack.enter_context(mock.patch.object(run_operator_console, "load_dashboard_snapshot", return_value=snapshot))
+            stack.enter_context(mock.patch.object(run_operator_console, "render_dashboard"))
             buffer = io.StringIO()
             console = Console(file=buffer, force_terminal=False, color_system=None, width=120)
             exit_code = run_operator_console.main([], console=console)
@@ -249,22 +253,22 @@ class QMISOperatorConsoleTests(unittest.TestCase):
             },
         )
 
-        with (
-            mock.patch.object(run_operator_console, "_collector_specs", return_value=specs),
-            mock.patch.object(run_operator_console, "_latest_collector_run_timestamp", return_value=None),
-            mock.patch.object(run_operator_console, "_latest_signal_timestamp", return_value=None),
-            mock.patch.object(run_operator_console, "materialize_features", return_value=0),
-            mock.patch.object(run_operator_console, "materialize_regime", return_value=0),
-            mock.patch.object(run_operator_console, "materialize_breadth_health", return_value=0),
-            mock.patch.object(run_operator_console, "materialize_liquidity_state", return_value=0),
-            mock.patch.object(run_operator_console, "materialize_factors", return_value=0),
-            mock.patch.object(run_operator_console, "materialize_relationships", return_value=0),
-            mock.patch.object(run_operator_console, "materialize_market_stress", return_value=0),
-            mock.patch.object(run_operator_console, "materialize_lead_lag_relationships", return_value=0),
-            mock.patch.object(run_operator_console, "materialize_alerts", return_value=0),
-            mock.patch.object(run_operator_console, "load_dashboard_snapshot", return_value=snapshot) as load_snapshot,
-            mock.patch.object(run_operator_console, "render_dashboard") as render_dashboard,
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(run_operator_console, "_collector_specs", return_value=specs))
+            stack.enter_context(mock.patch.object(run_operator_console, "_latest_collector_run_timestamp", return_value=None))
+            stack.enter_context(mock.patch.object(run_operator_console, "_latest_signal_timestamp", return_value=None))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_features", return_value=0))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_regime", return_value=0))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_breadth_health", return_value=0))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_liquidity_state", return_value=0))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_factors", return_value=0))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_relationships", return_value=0))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_market_stress", return_value=0))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_cycle_snapshots", return_value=0))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_lead_lag_relationships", return_value=0))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_alerts", return_value=0))
+            load_snapshot = stack.enter_context(mock.patch.object(run_operator_console, "load_dashboard_snapshot", return_value=snapshot))
+            render_dashboard = stack.enter_context(mock.patch.object(run_operator_console, "render_dashboard"))
             buffer = io.StringIO()
             console = Console(file=buffer, force_terminal=False, color_system=None, width=120)
             exit_code = run_operator_console.main([], console=console)
@@ -327,9 +331,12 @@ class QMISOperatorConsoleTests(unittest.TestCase):
                 mock.patch.object(run_operator_console, "load_config") as load_config,
                 mock.patch.object(run_operator_console, "materialize_features", return_value=0),
                 mock.patch.object(run_operator_console, "materialize_regime", return_value=0),
+                mock.patch.object(run_operator_console, "materialize_breadth_health", return_value=0),
+                mock.patch.object(run_operator_console, "materialize_liquidity_state", return_value=0),
                 mock.patch.object(run_operator_console, "materialize_factors", return_value=0),
                 mock.patch.object(run_operator_console, "materialize_relationships", return_value=0),
                 mock.patch.object(run_operator_console, "materialize_market_stress", return_value=0),
+                mock.patch.object(run_operator_console, "materialize_cycle_snapshots", return_value=0),
                 mock.patch.object(run_operator_console, "materialize_lead_lag_relationships", return_value=0),
                 mock.patch.object(run_operator_console, "materialize_alerts", return_value=0),
                 mock.patch.object(run_operator_console, "load_dashboard_snapshot", return_value=snapshot),

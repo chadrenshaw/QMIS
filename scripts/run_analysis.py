@@ -19,6 +19,7 @@ from qmis.logger import get_logger
 from qmis.scheduling import ANALYSIS_GROUPS, build_schedule_manifest, format_schedule_manifest
 from qmis.signals.breadth import materialize_breadth_health
 from qmis.signals.correlations import materialize_relationships
+from qmis.signals.cycles import materialize_cycle_snapshots
 from qmis.signals.factors import materialize_factors
 from qmis.signals.leadlag import materialize_lead_lag_relationships
 from qmis.signals.liquidity import materialize_liquidity_state
@@ -71,11 +72,12 @@ def main(argv: list[str] | None = None) -> int:
     factor_rows = materialize_factors(db_path=config.db_path)
     relationship_rows = materialize_relationships(db_path=config.db_path)
     stress_rows = materialize_market_stress(db_path=config.db_path)
+    cycle_rows = materialize_cycle_snapshots(db_path=config.db_path)
     lead_lag_rows = materialize_lead_lag_relationships(db_path=config.db_path)
     logger.info(
         (
         "Materialized %s feature rows, %s regime rows, %s breadth rows, %s liquidity rows, %s factor rows, %s relationship rows, "
-        "%s stress rows, and %s lead-lag rows into %s for cadence=%s"
+        "%s stress rows, %s cycle rows, and %s lead-lag rows into %s for cadence=%s"
         ),
         feature_rows,
         regime_rows,
@@ -84,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         factor_rows,
         relationship_rows,
         stress_rows,
+        cycle_rows,
         lead_lag_rows,
         config.db_path,
         args.cadence,
@@ -91,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"QMIS analysis materialized {feature_rows} feature rows, "
         f"{regime_rows} regime rows, {breadth_rows} breadth rows, {liquidity_rows} liquidity rows, {factor_rows} factor rows, {relationship_rows} relationship rows, "
-        f"{stress_rows} stress rows, and {lead_lag_rows} lead-lag rows into {config.db_path} for cadence={args.cadence}"
+        f"{stress_rows} stress rows, {cycle_rows} cycle rows, and {lead_lag_rows} lead-lag rows into {config.db_path} for cadence={args.cadence}"
     )
     return 0
 

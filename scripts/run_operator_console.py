@@ -35,6 +35,7 @@ from qmis.features.normalization import materialize_features
 from qmis.logger import get_logger
 from qmis.signals.breadth import materialize_breadth_health
 from qmis.signals.correlations import materialize_relationships
+from qmis.signals.cycles import materialize_cycle_snapshots
 from qmis.signals.factors import materialize_factors
 from qmis.signals.leadlag import materialize_lead_lag_relationships
 from qmis.signals.liquidity import materialize_liquidity_state
@@ -340,6 +341,7 @@ def _refresh_pipeline(
         "factors": int(materialize_factors(db_path=db_path)),
         "relationships": int(materialize_relationships(db_path=db_path)),
         "stress": int(materialize_market_stress(db_path=db_path)),
+        "cycles": int(materialize_cycle_snapshots(db_path=db_path)),
         "lead_lag": int(materialize_lead_lag_relationships(db_path=db_path)),
         "alerts": int(materialize_alerts(db_path=db_path)),
     }
@@ -353,7 +355,7 @@ def _render_refresh_summary(summary: dict[str, int | dict[str, int]], console: C
         "Refresh complete\n"
         f"Collectors: {collector_text}\n"
         f"Features: {summary['features']}  Regime: {summary['regime']}  Breadth: {summary['breadth']}  Liquidity: {summary['liquidity']}  Factors: {summary['factors']}  Stress: {summary['stress']}  "
-        f"Relationships: {summary['relationships']}  Lead-lag: {summary['lead_lag']}  Alerts: {summary['alerts']}"
+        f"Cycles: {summary['cycles']}  Relationships: {summary['relationships']}  Lead-lag: {summary['lead_lag']}  Alerts: {summary['alerts']}"
     )
     failures = summary.get("collector_failures", [])
     if failures:
@@ -370,7 +372,7 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
     if args.dry_run:
         message = (
             f"QMIS operator console dry-run: repo={config.repo_root} db={config.db_path} "
-            "collectors=all analysis=features,regime,breadth,liquidity,factors,relationships,stress,lead-lag alerts=materialize dashboard=render"
+            "collectors=all analysis=features,regime,breadth,liquidity,factors,relationships,stress,cycles,lead-lag alerts=materialize dashboard=render"
         )
         logger.info(message)
         print(message)

@@ -93,13 +93,16 @@ class QMISAlertRuleTests(unittest.TestCase):
         cycles = pd.DataFrame(
             [
                 {
-                    "series_name": "BTCUSD",
-                    "period_days": 29.4,
-                    "frequency": 1 / 29.4,
-                    "power": 17.0,
-                    "relative_power": 0.48,
-                    "matched_cycle": "lunar_period",
-                    "confidence_label": "validated",
+                    "ts": pd.Timestamp("2026-03-08"),
+                    "cycle_name": "solar_cycle",
+                    "phase": "peak",
+                    "strength": 0.86,
+                    "is_turning_point": True,
+                    "transition_from": "rising",
+                    "alert_on_transition": True,
+                    "summary": "Solar activity reached a local peak after a sustained rise in the 90d average.",
+                    "supporting_signals": '["sunspot_number"]',
+                    "metadata": '{"window_365d_mean": 155.2}',
                 }
             ]
         )
@@ -113,14 +116,14 @@ class QMISAlertRuleTests(unittest.TestCase):
             cycles=cycles,
         )
 
-        self.assertEqual(set(alerts["alert_type"]), {"regime_change", "threshold", "correlation_discovery", "relationship_break", "cycle_match"})
+        self.assertEqual(set(alerts["alert_type"]), {"regime_change", "threshold", "correlation_discovery", "relationship_break", "cycle_phase_transition"})
         self.assertIn("regime_change:INFLATIONARY EXPANSION->CRISIS / RISK-OFF", set(alerts["dedupe_key"]))
         self.assertIn("threshold:yield_curve_inversion", set(alerts["dedupe_key"]))
         self.assertIn("threshold:vix_stress", set(alerts["dedupe_key"]))
         self.assertIn("correlation:sunspot_number:BTCUSD:365:28", set(alerts["dedupe_key"]))
         self.assertNotIn("relationship_break:gold:yield_10y:30", set(alerts["dedupe_key"]))
         self.assertIn("relationship_break:BTCUSD:fed_balance_sheet:30", set(alerts["dedupe_key"]))
-        self.assertIn("cycle:BTCUSD:lunar_period", set(alerts["dedupe_key"]))
+        self.assertIn("cycle_transition:solar_cycle:rising->peak", set(alerts["dedupe_key"]))
 
 
 if __name__ == "__main__":

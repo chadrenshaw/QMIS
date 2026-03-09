@@ -10,7 +10,6 @@ import pandas as pd
 from qmis.alerts.rules import evaluate_alert_rules
 from qmis.schema import bootstrap_database
 from qmis.signals.anomalies import detect_relationship_anomalies
-from qmis.signals.cycles import detect_dominant_cycles
 from qmis.storage import connect_db, get_default_db_path
 
 
@@ -141,14 +140,23 @@ def materialize_alerts(db_path: Path | None = None) -> int:
             """
         ).fetchdf()
         anomalies = detect_relationship_anomalies(relationships)
-        signal_history = connection.execute(
+        cycles = connection.execute(
             """
-            SELECT ts, series_name, value
-            FROM signals
-            ORDER BY series_name, ts
+            SELECT
+                ts,
+                cycle_name,
+                phase,
+                strength,
+                is_turning_point,
+                transition_from,
+                alert_on_transition,
+                summary,
+                supporting_signals,
+                metadata
+            FROM cycle_snapshots
+            ORDER BY cycle_name
             """
         ).fetchdf()
-        cycles = detect_dominant_cycles(signal_history)
 
         alerts = evaluate_alert_rules(
             latest_regime=latest_regime,
