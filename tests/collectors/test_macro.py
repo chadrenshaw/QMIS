@@ -61,6 +61,14 @@ class QMISMacroCollectorTests(unittest.TestCase):
         self.assertEqual(metadata["indicator_name"], "PMI")
         self.assertEqual(metadata["source_type"], "fred")
 
+    def test_normalize_macro_signals_returns_empty_schema_when_all_series_are_missing(self) -> None:
+        from qmis.collectors.macro import SIGNAL_COLUMNS, normalize_macro_signals
+
+        signals = normalize_macro_signals({})
+
+        self.assertTrue(signals.empty)
+        self.assertEqual(list(signals.columns), SIGNAL_COLUMNS)
+
     def test_run_macro_collector_persists_rows_into_signals_table(self) -> None:
         from qmis.collectors.macro import run_macro_collector
 
@@ -96,6 +104,20 @@ class QMISMacroCollectorTests(unittest.TestCase):
                 "unit": "millions_usd",
             },
         )
+
+    def test_run_macro_collector_returns_zero_rows_when_all_fetches_are_skipped(self) -> None:
+        from qmis.collectors.macro import run_macro_collector
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "qmis.duckdb"
+            with mock.patch(
+                "qmis.collectors.macro.fetch_macro_series",
+                return_value={},
+            ):
+                inserted_rows = run_macro_collector(db_path=db_path)
+
+        self.assertEqual(inserted_rows, 0)
+        self.assertFalse(db_path.exists())
 
     def test_fetch_series_with_csv_fallback_accepts_fred_graph_shape(self) -> None:
         from qmis.collectors.macro import _fetch_series_with_csv_fallback

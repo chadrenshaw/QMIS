@@ -73,6 +73,16 @@ MACRO_SERIES: dict[str, dict[str, str]] = {
     },
 }
 
+SIGNAL_COLUMNS = [
+    "ts",
+    "source",
+    "category",
+    "series_name",
+    "value",
+    "unit",
+    "metadata",
+]
+
 
 def _fetch_series_with_fred_api(
     series_id: str,
@@ -271,7 +281,10 @@ def normalize_macro_signals(series_payloads: dict[str, pd.Series]) -> pd.DataFra
                 }
             )
 
-    return pd.DataFrame(rows).sort_values(["ts", "series_name"]).reset_index(drop=True)
+    if not rows:
+        return pd.DataFrame(columns=SIGNAL_COLUMNS)
+
+    return pd.DataFrame(rows, columns=SIGNAL_COLUMNS).sort_values(["ts", "series_name"]).reset_index(drop=True)
 
 
 def persist_macro_signals(signals: pd.DataFrame, db_path: Path | None = None) -> int:
