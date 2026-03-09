@@ -1,0 +1,76 @@
+steps:
+  backend-tests:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    commands:
+      - uv sync --frozen
+      - uv run python -m unittest -v
+
+  frontend-tests-and-build:
+    image: node:22-bookworm-slim
+    commands:
+      - cd web
+      - npm ci
+      - npm test -- --run
+      - npm run build
+
+  verify-container-build:
+    image: woodpeckerci/plugin-docker-buildx
+    depends_on:
+      - backend-tests
+      - frontend-tests-and-build
+    settings:
+      registry: gitea.chadlee.org
+      repo: gitea.chadlee.org/${CI_REPO_OWNER}/${CI_REPO_NAME}
+      dockerfile: Dockerfile
+      dry_run: true
+      build_args_from_env:
+        - CI_REPO_URL
+        - CI_COMMIT_SHA
+    when:
+      event:
+        - pull_request
+        - push
+        - tag
+
+  publish-container-default-branch:
+    image: woodpeckerci/plugin-docker-buildx
+    depends_on:
+      - verify-container-build
+    settings:
+      registry: gitea.chadlee.org
+      repo: gitea.chadlee.org/${CI_REPO_OWNER}/${CI_REPO_NAME}
+      dockerfile: Dockerfile
+      username:
+        from_secret: gitea_registry_username
+      password:
+        from_secret: gitea_registry_password
+      tags:
+        - latest
+      build_args_from_env:
+        - CI_REPO_URL
+        - CI_COMMIT_SHA
+    when:
+      event:
+        - push
+      branch:
+        - main
+
+  publish-container-tags:
+    image: woodpeckerci/plugin-docker-buildx
+    depends_on:
+      - verify-container-build
+    settings:
+      registry: gitea.chadlee.org
+      repo: gitea.chadlee.org/${CI_REPO_OWNER}/${CI_REPO_NAME}
+      dockerfile: Dockerfile
+      username:
+        from_secret: gitea_registry_username
+      password:
+        from_secret: gitea_registry_password
+      auto_tag: true
+      build_args_from_env:
+        - CI_REPO_URL
+        - CI_COMMIT_SHA
+    when:
+      event:
+        - tag

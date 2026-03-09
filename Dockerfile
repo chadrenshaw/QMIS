@@ -9,6 +9,9 @@ RUN npm run build
 
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS runtime
 
+ARG CI_REPO_URL="https://gitea.chadlee.org/crenshaw/macro-sentiment-engine"
+ARG CI_COMMIT_SHA="local"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
@@ -19,6 +22,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT="8000"
 
 WORKDIR /app
+
+LABEL org.opencontainers.image.title="QMIS" \
+      org.opencontainers.image.description="Quant Macro Intelligence System single-container runtime" \
+      org.opencontainers.image.source="${CI_REPO_URL}" \
+      org.opencontainers.image.revision="${CI_COMMIT_SHA}"
 
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --no-install-project

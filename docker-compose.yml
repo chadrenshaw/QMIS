@@ -1,8 +1,6 @@
 services:
   qmis:
-    build:
-      context: .
-    image: qmis:local
+    image: ${QMIS_IMAGE:-gitea.chadlee.org/crenshaw/macro-sentiment-engine:latest}
     ports:
       - "8000:8000"
     environment:

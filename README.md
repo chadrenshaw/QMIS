@@ -30,6 +30,10 @@ npm test -- --run
 
 QMIS can be packaged as a single container that serves the FastAPI read API and the built frontend from the same process.
 
+Published image path:
+
+- `gitea.chadlee.org/crenshaw/macro-sentiment-engine:latest`
+
 ### Runtime Environment
 
 - `QMIS_DATA_ROOT`
@@ -57,6 +61,8 @@ QMIS can be packaged as a single container that serves the FastAPI read API and 
 docker build -t qmis:local .
 ```
 
+The Dockerfile also accepts CI metadata build args so Woodpecker can stamp the image with the source repo URL and commit SHA.
+
 ### Run The Container
 
 ```bash
@@ -78,7 +84,32 @@ After startup:
 ### Docker Compose
 
 ```bash
-docker compose up --build
+docker compose up
 ```
 
-The included [docker-compose.yml](/Users/crenshaw/Projects/macro-sentiment-engine/docker-compose.yml) mounts `./runtime` into `/var/lib/qmis`, so DuckDB and logs survive container restarts.
+The included [docker-compose.yml](/Users/crenshaw/Projects/macro-sentiment-engine/docker-compose.yml) defaults to pulling `gitea.chadlee.org/crenshaw/macro-sentiment-engine:latest` and mounts `./runtime` into `/var/lib/qmis`, so DuckDB and logs survive container restarts.
+
+To run Compose against a locally built image instead of the published registry image:
+
+```bash
+QMIS_IMAGE=qmis:local docker compose up
+```
+
+## Woodpecker CI/CD
+
+The repository now expects container build and publishing to happen in Woodpecker via [.woodpecker.yml](/Users/crenshaw/Projects/macro-sentiment-engine/.woodpecker.yml).
+
+Pipeline behavior:
+
+- run backend tests with `uv run python -m unittest -v`
+- run frontend tests and production build
+- verify the container build on pull requests, pushes, and tags
+- publish `latest` to `gitea.chadlee.org/crenshaw/macro-sentiment-engine` on pushes to `main`
+- publish semver-style tags to the same Gitea registry on tag events
+
+Required Woodpecker secrets:
+
+- `gitea_registry_username`
+- `gitea_registry_password`
+
+These credentials must have permission to push packages to the same Gitea instance that hosts the code repository.
