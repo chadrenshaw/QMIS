@@ -29,7 +29,7 @@ class QMISSchemaTests(unittest.TestCase):
             finally:
                 connection.close()
 
-        self.assertEqual(tables, {"features", "regimes", "relationships", "signals"})
+        self.assertEqual(tables, {"alerts", "features", "regimes", "relationships", "signals"})
 
     def test_bootstrap_database_applies_spec_columns(self) -> None:
         from qmis.schema import bootstrap_database
@@ -55,6 +55,10 @@ class QMISSchemaTests(unittest.TestCase):
                 regimes_columns = {
                     row[1]
                     for row in connection.execute("PRAGMA table_info('regimes')").fetchall()
+                }
+                alerts_columns = {
+                    row[1]
+                    for row in connection.execute("PRAGMA table_info('alerts')").fetchall()
                 }
             finally:
                 connection.close()
@@ -89,6 +93,7 @@ class QMISSchemaTests(unittest.TestCase):
                 "correlation",
                 "p_value",
                 "relationship_state",
+                "confidence_label",
             },
         )
         self.assertEqual(
@@ -101,6 +106,23 @@ class QMISSchemaTests(unittest.TestCase):
                 "risk_score",
                 "regime_label",
                 "confidence",
+            },
+        )
+        self.assertEqual(
+            alerts_columns,
+            {
+                "ts",
+                "alert_type",
+                "severity",
+                "rule_key",
+                "dedupe_key",
+                "title",
+                "message",
+                "source_table",
+                "series_name",
+                "series_x",
+                "series_y",
+                "metadata",
             },
         )
 

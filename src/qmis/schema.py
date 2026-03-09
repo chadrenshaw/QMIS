@@ -42,7 +42,8 @@ SCHEMA_STATEMENTS = (
         lag_days INTEGER,
         correlation DOUBLE,
         p_value DOUBLE,
-        relationship_state TEXT
+        relationship_state TEXT,
+        confidence_label TEXT
     )
     """,
     """
@@ -56,12 +57,43 @@ SCHEMA_STATEMENTS = (
         confidence DOUBLE
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS alerts (
+        ts TIMESTAMP,
+        alert_type TEXT,
+        severity TEXT,
+        rule_key TEXT,
+        dedupe_key TEXT,
+        title TEXT,
+        message TEXT,
+        source_table TEXT,
+        series_name TEXT,
+        series_x TEXT,
+        series_y TEXT,
+        metadata JSON
+    )
+    """,
+)
+
+SCHEMA_MIGRATIONS = (
+    "ALTER TABLE relationships ADD COLUMN IF NOT EXISTS confidence_label TEXT",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS rule_key TEXT",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS dedupe_key TEXT",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS title TEXT",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS message TEXT",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS source_table TEXT",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS series_name TEXT",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS series_x TEXT",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS series_y TEXT",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS metadata JSON",
 )
 
 
 def bootstrap_schema(connection) -> None:
     """Create the core QMIS tables on an existing connection."""
     for statement in SCHEMA_STATEMENTS:
+        connection.execute(statement)
+    for statement in SCHEMA_MIGRATIONS:
         connection.execute(statement)
 
 

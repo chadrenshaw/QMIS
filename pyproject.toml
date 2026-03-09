@@ -5,11 +5,18 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "astral>=3.2",
     "duckdb>=1.4.0",
+    "ephem>=4.2",
+    "fastapi>=0.116.1",
+    "fredapi>=0.5.2",
+    "httpx>=0.28.1",
     "numpy>=2.4.2",
     "pandas>=3.0.1",
     "requests>=2.32.5",
     "rich>=14.3.3",
     "scipy>=1.16.2",
+    "skyfield>=1.53",
+    "uvicorn>=0.35.0",
     "yfinance>=1.2.0",
 ]

@@ -1,0 +1,44 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-canvas: #f4efe7;
+  --color-shell: linear-gradient(140deg, rgba(255, 255, 255, 0.88), rgba(247, 237, 225, 0.9));
+  --color-surface: #fffaf2;
+  --color-ink: #14232e;
+  --color-accent: #cf5f18;
+  --color-signal: #227c9d;
+  --color-alert: #9f1239;
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, rgba(207, 95, 24, 0.18), transparent 36%),
+    radial-gradient(circle at top right, rgba(34, 124, 157, 0.16), transparent 32%),
+    linear-gradient(180deg, #f8f3eb 0%, #efe6da 100%);
+  color: var(--color-ink);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  button {
+    font: inherit;
+  }
+}

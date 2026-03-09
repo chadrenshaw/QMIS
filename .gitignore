@@ -3,3 +3,6 @@ __pycache__
 *.pyc
 .worktrees/
 db/*.duckdb
+web/node_modules/
+web/dist/
+web/.vite/

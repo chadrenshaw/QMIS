@@ -1,0 +1,185 @@
+"""Optional read-only FastAPI surface for QMIS."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from fastapi import FastAPI
+
+from qmis.alerts.engine import load_alert_snapshot
+from qmis.dashboard.cli import load_dashboard_snapshot
+from qmis.schema import bootstrap_database
+from qmis.signals.anomalies import detect_relationship_anomalies
+from qmis.storage import connect_db, get_default_db_path
+
+
+def _serialize_value(value: Any) -> Any:
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return value
+
+
+def _serialize_record(record: dict[str, Any]) -> dict[str, Any]:
+    return {key: _serialize_value(value) for key, value in record.items()}
+
+
+def _fetch_latest_signals(db_path: Path) -> dict[str, dict[str, Any]]:
+    with connect_db(db_path, read_only=True) as connection:
+        rows = connection.execute(
+            """
+            SELECT ts, series_name, value, unit, category, source
+            FROM (
+                SELECT
+                    ts,
+                    series_name,
+                    value,
+                    unit,
+                    category,
+                    source,
+                    ROW_NUMBER() OVER (PARTITION BY series_name ORDER BY ts DESC) AS row_number
+                FROM signals
+            )
+            WHERE row_number = 1
+            ORDER BY series_name
+            """
+        ).fetchdf()
+
+    return {
+        str(row["series_name"]): _serialize_record(
+            {
+                "ts": row["ts"],
+                "value": float(row["value"]),
+                "unit": str(row["unit"]),
+                "category": str(row["category"]),
+                "source": str(row["source"]),
+            }
+        )
+        for _, row in rows.iterrows()
+    }
+
+
+def _fetch_latest_regime(db_path: Path) -> dict[str, Any] | None:
+    with connect_db(db_path, read_only=True) as connection:
+        rows = connection.execute(
+            """
+            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence
+            FROM regimes
+            ORDER BY ts DESC
+            LIMIT 1
+            """
+        ).fetchdf()
+
+    if rows.empty:
+        return None
+    row = rows.iloc[0].to_dict()
+    return _serialize_record(row)
+
+
+def _fetch_relationships(db_path: Path) -> list[dict[str, Any]]:
+    with connect_db(db_path, read_only=True) as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                ts,
+                series_x,
+                series_y,
+                window_days,
+                lag_days,
+                correlation,
+                p_value,
+                relationship_state,
+                confidence_label
+            FROM relationships
+            ORDER BY ts DESC, ABS(correlation) DESC, window_days DESC
+            """
+        ).fetchdf()
+    return [_serialize_record(row) for row in rows.to_dict("records")]
+
+
+def _fetch_anomalies(db_path: Path) -> list[dict[str, Any]]:
+    with connect_db(db_path, read_only=True) as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                ts,
+                series_x,
+                series_y,
+                window_days,
+                lag_days,
+                correlation,
+                p_value,
+                relationship_state,
+                confidence_label
+            FROM relationships
+            WHERE lag_days = 0
+            ORDER BY ts DESC, window_days DESC
+            """
+        ).fetchdf()
+    anomalies = detect_relationship_anomalies(rows)
+    return [_serialize_record(row) for row in anomalies.to_dict("records")]
+
+
+def create_app(db_path: Path | None = None) -> FastAPI:
+    """Create the optional read-only FastAPI application."""
+    resolved_db_path = bootstrap_database(db_path or get_default_db_path())
+    app = FastAPI(title="QMIS Read API", version="0.1.0")
+
+    @app.get("/health")
+    def health() -> dict[str, Any]:
+        return {"status": "ok", "db_path": str(resolved_db_path), "read_only": True}
+
+    @app.get("/regime/latest")
+    def regime_latest() -> dict[str, Any]:
+        regime = _fetch_latest_regime(resolved_db_path)
+        return regime or {}
+
+    @app.get("/signals/latest")
+    def signals_latest() -> dict[str, Any]:
+        return {"signals": _fetch_latest_signals(resolved_db_path)}
+
+    @app.get("/relationships")
+    def relationships() -> dict[str, Any]:
+        return {"relationships": _fetch_relationships(resolved_db_path)}
+
+    @app.get("/anomalies")
+    def anomalies() -> dict[str, Any]:
+        return {"anomalies": _fetch_anomalies(resolved_db_path)}
+
+    @app.get("/alerts")
+    def alerts() -> dict[str, Any]:
+        rows, summary = load_alert_snapshot(db_path=resolved_db_path)
+        return {
+            "summary": _serialize_record(summary),
+            "alerts": [_serialize_record(row) for row in rows.to_dict("records")],
+        }
+
+    @app.get("/dashboard")
+    def dashboard() -> dict[str, Any]:
+        snapshot = load_dashboard_snapshot(db_path=resolved_db_path)
+        return {
+            "trend_summary": {key: _serialize_record(value) for key, value in snapshot["trend_summary"].items()},
+            "signal_summary": {key: _serialize_record(value) for key, value in snapshot["signal_summary"].items()},
+            "signal_groups": snapshot["signal_groups"],
+            "signal_history": {
+                key: [_serialize_record(point) for point in values]
+                for key, values in snapshot["signal_history"].items()
+            },
+            "scores": snapshot["scores"],
+            "score_history": [_serialize_record(point) for point in snapshot["score_history"]],
+            "regime": _serialize_record(snapshot["regime"]) if snapshot["regime"] else None,
+            "yield_curve": snapshot["yield_curve"],
+            "yield_curve_state": snapshot["yield_curve_state"],
+            "freshness": _serialize_record(snapshot["freshness"]),
+            "latest_snapshot_ts": _serialize_value(snapshot["latest_snapshot_ts"]),
+            "top_relationships": [_serialize_record(row) for row in snapshot["top_relationships"]],
+            "lead_lag_relationships": [_serialize_record(row) for row in snapshot["lead_lag_relationships"]],
+            "anomalies": [_serialize_record(row) for row in snapshot["anomalies"]],
+            "alert_summary": _serialize_record(snapshot["alert_summary"]),
+            "alerts": [_serialize_record(row) for row in snapshot["alerts"]],
+        }
+
+    return app
+
+
+app = create_app()
