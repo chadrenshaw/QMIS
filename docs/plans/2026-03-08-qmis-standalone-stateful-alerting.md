@@ -1,6 +1,6 @@
-# Macro Stateful Alerting Implementation Plan
+# QMIS Standalone Stateful Alerting Implementation Plan
 
-**Goal:** Extend the macro sentiment engine with SQLite-backed signal state tracking and consolidated ntfy alerts that only fire on state transitions.
+**Goal:** Extend the standalone QMIS macro engine with SQLite-backed signal state tracking and consolidated ntfy alerts that only fire on state transitions.
 
 **Architecture:** Keep the existing market-analysis pipeline intact, then add a persistence layer that stores discrete signal states and recent alert events. Each run compares the current snapshot with the stored snapshot, records only transitions, keeps recent events visible for 24 hours, and emits a single ntfy notification summarizing new changes.
 

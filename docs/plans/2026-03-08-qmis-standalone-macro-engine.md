@@ -1,6 +1,6 @@
-# Macro Sentiment Engine Implementation Plan
+# QMIS Standalone Macro Engine Implementation Plan
 
-**Goal:** Build a standalone Python 3.12 macro market sentiment engine that fetches live market data, derives macro signals, classifies the current regime, and renders a rich dashboard with alerts.
+**Goal:** Build the standalone Python 3.12 QMIS macro market engine that fetches live market data, derives macro signals, classifies the current regime, and renders a rich dashboard with alerts.
 
 **Architecture:** Implement the script as a small set of pure calculation and formatting helpers layered beneath a thin CLI entrypoint. Keep data acquisition isolated so tests can exercise trend, score, regime, and alert logic without hitting the network.
 
@@ -13,7 +13,7 @@
 ### Task 1: Plan And Test Harness
 
 **Files:**
-- Create: `docs/plans/2026-03-08-macro-sentiment-engine.md`
+- Create: `docs/plans/2026-03-08-qmis-standalone-macro-engine.md`
 - Create: `tests/test_macro_sentiment_engine.py`
 
 **Step 1: Write the failing test**

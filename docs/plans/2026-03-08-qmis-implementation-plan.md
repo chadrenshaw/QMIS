@@ -19,8 +19,8 @@
 **Team**: 1 engineer
 
 **Constraints**:
-- Must follow [QUANT_MACRO_INT_SPEC.md](/Users/crenshaw/Projects/macro-sentiment-engine/docs/specs/QUANT_MACRO_INT_SPEC.md)
-- Must follow [QUANT_MACRO_INT_SPEC_ADDENDUM.md](/Users/crenshaw/Projects/macro-sentiment-engine/docs/specs/QUANT_MACRO_INT_SPEC_ADDENDUM.md)
+- Must follow [QUANT_MACRO_INT_SPEC.md](/Users/crenshaw/Projects/QMIS/docs/specs/QUANT_MACRO_INT_SPEC.md)
+- Must follow [QUANT_MACRO_INT_SPEC_ADDENDUM.md](/Users/crenshaw/Projects/QMIS/docs/specs/QUANT_MACRO_INT_SPEC_ADDENDUM.md)
 - Must target this repository, which is currently minimal and not yet aligned to the target package structure
 - Must use DuckDB as the authoritative local store
 

@@ -1,4 +1,4 @@
-# Macro Sentiment Engine
+# QMIS
 
 QMIS is a DuckDB-backed macro signal engine with collectors, analysis jobs, a Rich CLI dashboard, and an optional read-only FastAPI surface.
 
@@ -32,7 +32,7 @@ QMIS can be packaged as a single container that serves the FastAPI read API and 
 
 Published image path:
 
-- `gitea.chadlee.org/crenshaw/macro-sentiment-engine:latest`
+- `gitea.chadlee.org/crenshaw/QMIS:latest`
 
 ### Runtime Environment
 
@@ -87,7 +87,7 @@ After startup:
 docker compose up
 ```
 
-The included [docker-compose.yml](/Users/crenshaw/Projects/macro-sentiment-engine/docker-compose.yml) defaults to pulling `gitea.chadlee.org/crenshaw/macro-sentiment-engine:latest` and mounts `./runtime` into `/var/lib/qmis`, so DuckDB and logs survive container restarts.
+The included [docker-compose.yml](/Users/crenshaw/Projects/QMIS/docker-compose.yml) defaults to pulling `gitea.chadlee.org/crenshaw/QMIS:latest` and mounts `./runtime` into `/var/lib/qmis`, so DuckDB and logs survive container restarts.
 
 To run Compose against a locally built image instead of the published registry image:
 
@@ -97,14 +97,14 @@ QMIS_IMAGE=qmis:local docker compose up
 
 ## Woodpecker CI/CD
 
-The repository now expects container build and publishing to happen in Woodpecker via [.woodpecker.yml](/Users/crenshaw/Projects/macro-sentiment-engine/.woodpecker.yml).
+The repository now expects container build and publishing to happen in Woodpecker via [.woodpecker.yml](/Users/crenshaw/Projects/QMIS/.woodpecker.yml).
 
 Pipeline behavior:
 
 - run backend tests with `uv run python -m unittest -v`
 - run frontend tests and production build
 - verify the container build on pull requests, pushes, and tags
-- publish `latest` to `gitea.chadlee.org/crenshaw/macro-sentiment-engine` on pushes to `main`
+- publish `latest` to `gitea.chadlee.org/crenshaw/QMIS` on pushes to `main`
 - publish semver-style tags to the same Gitea registry on tag events
 
 Required Woodpecker secrets:

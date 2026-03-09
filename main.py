@@ -1,5 +1,5 @@
 def main():
-    print("Hello from macro-sentiment-engine!")
+    print("Hello from QMIS!")
 
 
 if __name__ == "__main__":

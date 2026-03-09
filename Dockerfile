@@ -9,7 +9,7 @@ RUN npm run build
 
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS runtime
 
-ARG CI_REPO_URL="https://gitea.chadlee.org/crenshaw/macro-sentiment-engine"
+ARG CI_REPO_URL="https://gitea.chadlee.org/crenshaw/QMIS"
 ARG CI_COMMIT_SHA="local"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

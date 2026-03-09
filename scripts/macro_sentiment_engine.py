@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Global macro sentiment engine using live Yahoo Finance market data."""
+"""QMIS standalone macro sentiment engine using live Yahoo Finance market data."""
 
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ def build_http_session() -> requests.Session:
     session.headers.update(
         {
             "User-Agent": (
-                "macro-sentiment-engine/1.0 "
+                "QMIS/1.0 "
                 "(https://finance.yahoo.com; contact=local-script)"
             )
         }
@@ -852,7 +852,7 @@ def main() -> int:
     try:
         payload = analyze_macro_environment()
     except MarketDataError as exc:
-        console.print(Panel(str(exc), title="Macro Sentiment Engine Error", border_style="red"))
+        console.print(Panel(str(exc), title="QMIS Macro Engine Error", border_style="red"))
         return 1
 
     _, recent_events = apply_signal_snapshot(

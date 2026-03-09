@@ -29,10 +29,10 @@ class QMISDeploymentAssetTests(unittest.TestCase):
         self.assertIn("docker build", readme)
         self.assertIn("docker run", readme)
         self.assertIn("docker compose up", readme)
-        self.assertIn("gitea.chadlee.org/crenshaw/macro-sentiment-engine", readme)
+        self.assertIn("gitea.chadlee.org/crenshaw/QMIS", readme)
         self.assertIn("gitea_registry_username", readme)
         self.assertIn("gitea_registry_password", readme)
-        self.assertIn("gitea.chadlee.org/crenshaw/macro-sentiment-engine:latest", compose)
+        self.assertIn("gitea.chadlee.org/crenshaw/QMIS:latest", compose)
         self.assertIn("woodpeckerci/plugin-docker-buildx", woodpecker)
         self.assertIn("gitea.chadlee.org/${CI_REPO_OWNER}/${CI_REPO_NAME}", woodpecker)
 
