@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from qmis.signals.persistence import build_persistence_metadata
+
 
 def detect_relationship_anomalies(relationships: pd.DataFrame) -> pd.DataFrame:
     """Detect broken or weakening short-term relationships against strong historical baselines."""
@@ -18,6 +20,11 @@ def detect_relationship_anomalies(relationships: pd.DataFrame) -> pd.DataFrame:
         "current_window_days",
         "historical_correlation",
         "current_correlation",
+        "persistence_windows",
+        "required_windows",
+        "observed_windows",
+        "persistence_label",
+        "passes_filter",
     ]
     if relationships.empty:
         return pd.DataFrame(columns=columns)
@@ -36,6 +43,12 @@ def detect_relationship_anomalies(relationships: pd.DataFrame) -> pd.DataFrame:
             continue
         if current_state not in {"broken", "weakening"}:
             continue
+        degraded_windows = pair_frame.loc[
+            (pair_frame["window_days"] < int(historical["window_days"]))
+            & (pair_frame["relationship_state"].isin(["broken", "weakening"])),
+            "window_days",
+        ].tolist()
+        persistence = build_persistence_metadata(degraded_windows, family="relationship_alerts")
 
         rows.append(
             {
@@ -49,6 +62,7 @@ def detect_relationship_anomalies(relationships: pd.DataFrame) -> pd.DataFrame:
                 "current_window_days": int(current["window_days"]),
                 "historical_correlation": float(historical["correlation"]),
                 "current_correlation": float(current["correlation"]),
+                **persistence,
             }
         )
 

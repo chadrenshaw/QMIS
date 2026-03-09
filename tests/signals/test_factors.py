@@ -122,6 +122,9 @@ class QMISFactorTests(unittest.TestCase):
         liquidity_assets = json.loads(factors.loc[factors["factor_name"] == "liquidity", "supporting_assets"].iloc[0])
         self.assertIn("fed_balance_sheet", liquidity_assets)
         self.assertIn("yield_3m", liquidity_assets)
+        self.assertIn("persistence_windows", factors.columns)
+        self.assertIn("passes_filter", factors.columns)
+        self.assertTrue(bool(factors.loc[factors["factor_name"] == "liquidity", "passes_filter"].iloc[0]))
 
     def test_materialize_factors_persists_latest_snapshot(self) -> None:
         from qmis.schema import bootstrap_database

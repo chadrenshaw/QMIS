@@ -256,6 +256,8 @@ def summarize_relationship_breaks(snapshot: dict[str, Any]) -> list[dict[str, An
     for row in snapshot.get("anomalies", []):
         if str(row.get("anomaly_type")) != "relationship_break":
             continue
+        if not bool(row.get("passes_filter", True)):
+            continue
         title = _relationship_change_title(snapshot, row)
         if not title:
             continue
@@ -459,7 +461,9 @@ def build_market_drivers(snapshot: dict[str, Any]) -> list[dict[str, str]]:
         for factor in sorted(
             factors,
             key=lambda item: (int(item.get("component_rank", 99)), -float(item.get("strength", 0.0))),
-        )[:3]:
+        ):
+            if not bool(factor.get("passes_filter", True)):
+                continue
             factor_name = str(factor.get("factor_name", "")).lower()
             direction = str(factor.get("direction", "")).lower()
             if factor_name == "liquidity":
@@ -473,16 +477,19 @@ def build_market_drivers(snapshot: dict[str, Any]) -> list[dict[str, str]]:
 
             strength = float(factor.get("strength", 0.0))
             strength_label = "Strong" if strength >= 0.6 else "Moderate" if strength >= 0.35 else "Developing"
+            persistence_label = str(factor.get("persistence_label", "persistent")).replace("_", " ").title()
             supporting_assets = factor.get("supporting_assets", [])
             if not isinstance(supporting_assets, list):
                 supporting_assets = []
             summary = str(factor.get("summary") or "").strip()
             if summary:
-                detail = f"{strength_label} | {summary}"
+                detail = f"{persistence_label} | {strength_label} | {summary}"
             else:
                 assets_label = ", ".join(str(asset) for asset in supporting_assets[:3]) or "supporting assets unavailable"
-                detail = f"{strength_label} | {direction or 'mixed'} | {assets_label}"
+                detail = f"{persistence_label} | {strength_label} | {direction or 'mixed'} | {assets_label}"
             drivers.append({"title": title, "summary": detail})
+            if len(drivers) == 3:
+                break
         return drivers
 
     drivers = []
@@ -513,7 +520,7 @@ def build_divergence_summary(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
                 "persistence_label": str(row.get("persistence_label", "developing")),
             }
             for row in rows
-            if row.get("title")
+            if row.get("title") and bool(row.get("passes_filter", True))
         ),
         key=lambda item: item["strength"],
         reverse=True,

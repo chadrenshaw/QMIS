@@ -67,6 +67,26 @@ class QMISAlertRuleTests(unittest.TestCase):
                     "current_window_days": 30,
                     "historical_correlation": -0.82,
                     "current_correlation": -0.05,
+                    "persistence_windows": 1,
+                    "required_windows": 2,
+                    "persistence_label": "transient",
+                    "passes_filter": False,
+                },
+                {
+                    "ts": pd.Timestamp("2026-03-08"),
+                    "series_x": "BTCUSD",
+                    "series_y": "fed_balance_sheet",
+                    "anomaly_type": "relationship_break",
+                    "historical_state": "stable",
+                    "current_state": "broken",
+                    "historical_window_days": 365,
+                    "current_window_days": 30,
+                    "historical_correlation": 0.73,
+                    "current_correlation": -0.08,
+                    "persistence_windows": 2,
+                    "required_windows": 2,
+                    "persistence_label": "persistent",
+                    "passes_filter": True,
                 }
             ]
         )
@@ -98,7 +118,8 @@ class QMISAlertRuleTests(unittest.TestCase):
         self.assertIn("threshold:yield_curve_inversion", set(alerts["dedupe_key"]))
         self.assertIn("threshold:vix_stress", set(alerts["dedupe_key"]))
         self.assertIn("correlation:sunspot_number:BTCUSD:365:28", set(alerts["dedupe_key"]))
-        self.assertIn("relationship_break:gold:yield_10y:30", set(alerts["dedupe_key"]))
+        self.assertNotIn("relationship_break:gold:yield_10y:30", set(alerts["dedupe_key"]))
+        self.assertIn("relationship_break:BTCUSD:fed_balance_sheet:30", set(alerts["dedupe_key"]))
         self.assertIn("cycle:BTCUSD:lunar_period", set(alerts["dedupe_key"]))
 
 

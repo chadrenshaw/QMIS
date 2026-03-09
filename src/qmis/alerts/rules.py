@@ -169,6 +169,8 @@ def build_relationship_break_alerts(anomalies: pd.DataFrame) -> list[dict[str, A
 
     alerts: list[dict[str, Any]] = []
     for row in anomalies.itertuples(index=False):
+        if hasattr(row, "passes_filter") and not bool(row.passes_filter):
+            continue
         severity = "critical" if str(row.anomaly_type) == "relationship_break" else "warning"
         alerts.append(
             _record(
@@ -190,6 +192,9 @@ def build_relationship_break_alerts(anomalies: pd.DataFrame) -> list[dict[str, A
                     "current_state": str(row.current_state),
                     "historical_window_days": int(row.historical_window_days),
                     "current_window_days": int(row.current_window_days),
+                    "persistence_windows": int(getattr(row, "persistence_windows", 0)),
+                    "required_windows": int(getattr(row, "required_windows", 0)),
+                    "persistence_label": str(getattr(row, "persistence_label", "")),
                 },
             )
         )

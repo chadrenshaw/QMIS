@@ -17,6 +17,7 @@ from qmis.schema import bootstrap_database
 from qmis.signals.anomalies import detect_relationship_anomalies
 from qmis.signals.divergence import detect_cross_market_divergences
 from qmis.signals.interpreter import build_operator_snapshot
+from qmis.signals.persistence import annotate_factor_persistence
 from qmis.storage import connect_db, get_default_db_path
 
 
@@ -285,6 +286,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         }
         for _, row in factor_rows.iterrows()
     ]
+    factors = annotate_factor_persistence(factors, feature_rows)
     market_stress = (
         {
             "ts": stress_rows.iloc[0]["ts"],

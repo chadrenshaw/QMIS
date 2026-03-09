@@ -147,7 +147,7 @@ class QMISDivergenceTests(unittest.TestCase):
         self.assertIn("365d", str(divergences.iloc[0]["summary"]))
         self.assertIn("30d", str(divergences.iloc[0]["summary"]))
 
-    def test_detect_cross_market_divergences_filters_single_window_noise(self) -> None:
+    def test_detect_cross_market_divergences_keeps_single_window_noise_for_debugging(self) -> None:
         from qmis.signals.divergence import detect_cross_market_divergences
 
         ts = pd.Timestamp("2026-03-08")
@@ -180,13 +180,16 @@ class QMISDivergenceTests(unittest.TestCase):
         features = pd.DataFrame(
             [
                 {"ts": ts, "series_name": "sp500", "trend_label": "UP", "pct_change_30d": 2.3},
-                {"ts": ts, "series_name": "copper", "trend_label": "UP", "pct_change_30d": 1.4},
+                {"ts": ts, "series_name": "copper", "trend_label": "DOWN", "pct_change_30d": -1.4},
             ]
         )
 
         divergences = detect_cross_market_divergences(relationships=relationships, features=features)
 
-        self.assertTrue(divergences.empty)
+        self.assertEqual(len(divergences), 1)
+        self.assertEqual(divergences.iloc[0]["divergence_key"], "equities_vs_copper")
+        self.assertEqual(divergences.iloc[0]["persistence_label"], "transient")
+        self.assertFalse(bool(divergences.iloc[0]["passes_filter"]))
 
 
 if __name__ == "__main__":

@@ -6,6 +6,8 @@ from typing import Any
 
 import pandas as pd
 
+from qmis.signals.persistence import build_persistence_metadata
+
 
 EXPECTED_MAGNITUDE = 0.6
 CURRENT_DIVERGENCE_THRESHOLD = 0.35
@@ -56,7 +58,10 @@ def _empty_frame() -> pd.DataFrame:
             "current_correlation",
             "current_state",
             "persistence_windows",
+            "required_windows",
+            "observed_windows",
             "persistence_label",
+            "passes_filter",
             "strength",
             "severity",
             "summary",
@@ -184,9 +189,6 @@ def _candidate_divergence(
     persistence_windows = int(
         degraded_rows.loc[degraded_rows["window_days"] < int(historical["window_days"]), "window_days"].nunique()
     )
-    if persistence_windows < 2:
-        return None
-
     correlation_gap = min(abs(float(historical["correlation"]) - float(current["correlation"])) / 1.5, 1.0)
     strength = min(
         1.0,
@@ -199,6 +201,10 @@ def _candidate_divergence(
     )
 
     latest_ts = pd.to_datetime(pair_rows["ts"]).max()
+    persistence = build_persistence_metadata(
+        degraded_rows.loc[degraded_rows["window_days"] < int(historical["window_days"]), "window_days"].tolist(),
+        family="divergences",
+    )
     return {
         "ts": latest_ts,
         "divergence_key": str(template["divergence_key"]),
@@ -212,8 +218,7 @@ def _candidate_divergence(
         "historical_correlation": float(historical["correlation"]),
         "current_correlation": float(current["correlation"]),
         "current_state": str(current["relationship_state"]),
-        "persistence_windows": persistence_windows,
-        "persistence_label": _persistence_label(persistence_windows),
+        **persistence,
         "strength": strength,
         "severity": _severity(strength),
         "summary": _build_summary(
@@ -223,7 +228,7 @@ def _candidate_divergence(
             current_window_days=int(current["window_days"]),
             historical_correlation=float(historical["correlation"]),
             current_correlation=float(current["correlation"]),
-            persistence_windows=persistence_windows,
+            persistence_windows=int(persistence["persistence_windows"]),
         ),
     }
 

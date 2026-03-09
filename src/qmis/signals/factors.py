@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from qmis.schema import bootstrap_database
+from qmis.signals.persistence import annotate_factor_persistence
 from qmis.storage import connect_db, get_default_db_path
 
 
@@ -198,6 +199,11 @@ def build_factor_frame(
         "summary",
         "supporting_assets",
         "loadings",
+        "persistence_windows",
+        "required_windows",
+        "observed_windows",
+        "persistence_label",
+        "passes_filter",
     ]
     if matrix.empty:
         return pd.DataFrame(columns=columns)
@@ -248,6 +254,7 @@ def build_factor_frame(
             }
         )
 
+    factor_rows = annotate_factor_persistence(factor_rows, feature_frame if feature_frame is not None else pd.DataFrame())
     result = pd.DataFrame(factor_rows, columns=columns)
     if result.empty:
         return result

@@ -295,6 +295,10 @@ class OperatorInterpreterTests(unittest.TestCase):
                     "direction": "stressed",
                     "summary": "VIX and weak breadth continue to reinforce a volatility regime.",
                     "supporting_assets": ["vix", "sp500_above_200dma", "new_lows"],
+                    "persistence_windows": 1,
+                    "required_windows": 2,
+                    "persistence_label": "transient",
+                    "passes_filter": False,
                 },
             ],
             "market_stress": {
@@ -366,7 +370,9 @@ class OperatorInterpreterTests(unittest.TestCase):
                     "expected_direction": "positive",
                     "observed_direction": "opposite_moves",
                     "persistence_windows": 2,
+                    "required_windows": 2,
                     "persistence_label": "persistent",
+                    "passes_filter": True,
                     "strength": 0.83,
                     "severity": "strong",
                     "summary": "BTCUSD is rising while the Fed balance sheet contracts, breaking a historically positive 365d relationship across the 90d and 30d windows.",
@@ -423,7 +429,7 @@ class OperatorInterpreterTests(unittest.TestCase):
         snapshot = self._snapshot()
         intelligence = build_operator_snapshot(snapshot)
 
-        self.assertEqual(len(intelligence["market_drivers"]), 3)
+        self.assertEqual(len(intelligence["market_drivers"]), 2)
         self.assertEqual(intelligence["market_drivers"][0]["title"], "Liquidity Tightening")
         self.assertEqual(intelligence["market_drivers"][1]["title"], "Crypto Cycle")
         self.assertEqual(intelligence["relationship_shifts"][0]["title"], "Crypto vs Macro Decoupling")

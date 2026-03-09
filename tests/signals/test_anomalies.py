@@ -52,6 +52,9 @@ class QMISAnomalyTests(unittest.TestCase):
         self.assertEqual(row["anomaly_type"], "relationship_break")
         self.assertEqual(row["current_state"], "broken")
         self.assertEqual(row["historical_state"], "stable")
+        self.assertEqual(row["persistence_windows"], 1)
+        self.assertEqual(row["persistence_label"], "transient")
+        self.assertFalse(bool(row["passes_filter"]))
 
 
 if __name__ == "__main__":

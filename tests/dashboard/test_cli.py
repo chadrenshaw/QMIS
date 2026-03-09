@@ -77,9 +77,10 @@ class QMISDashboardCLITests(unittest.TestCase):
                 {"ts": ts, "series_name": "new_lows", "pct_change_30d": -14.0, "pct_change_90d": -18.0, "pct_change_365d": -24.0, "zscore_30d": -0.9, "volatility_30d": 0.3, "slope_30d": -0.2, "drawdown_90d": -2.0, "trend_label": "DOWN"},
                 {"ts": ts, "series_name": "vix", "pct_change_30d": -2.0, "pct_change_90d": -4.0, "pct_change_365d": 1.0, "zscore_30d": -0.4, "volatility_30d": 0.3, "slope_30d": -0.1, "drawdown_90d": -5.0, "trend_label": "SIDEWAYS"},
                 {"ts": ts, "series_name": "pmi", "pct_change_30d": 7.0, "pct_change_90d": 10.0, "pct_change_365d": 12.0, "zscore_30d": 1.2, "volatility_30d": 0.1, "slope_30d": 0.2, "drawdown_90d": -1.5, "trend_label": "UP"},
+                {"ts": ts, "series_name": "yield_3m", "pct_change_30d": 0.4, "pct_change_90d": 0.8, "pct_change_365d": 1.5, "zscore_30d": 0.6, "volatility_30d": 0.1, "slope_30d": 0.1, "drawdown_90d": -0.1, "trend_label": "UP"},
                 {"ts": ts, "series_name": "yield_10y", "pct_change_30d": 0.2, "pct_change_90d": 0.4, "pct_change_365d": 0.8, "zscore_30d": 0.5, "volatility_30d": 0.1, "slope_30d": 0.1, "drawdown_90d": -0.2, "trend_label": "UP"},
-                {"ts": ts, "series_name": "fed_balance_sheet", "pct_change_30d": 5.0, "pct_change_90d": 7.0, "pct_change_365d": 14.0, "zscore_30d": 0.8, "volatility_30d": 0.1, "slope_30d": 0.1, "drawdown_90d": -2.0, "trend_label": "SIDEWAYS"},
-                {"ts": ts, "series_name": "reverse_repo_usage", "pct_change_30d": -8.0, "pct_change_90d": -10.0, "pct_change_365d": -30.0, "zscore_30d": -1.4, "volatility_30d": 0.2, "slope_30d": -0.4, "drawdown_90d": -12.0, "trend_label": "DOWN"},
+                {"ts": ts, "series_name": "fed_balance_sheet", "pct_change_30d": -5.0, "pct_change_90d": -7.0, "pct_change_365d": -14.0, "zscore_30d": -0.8, "volatility_30d": 0.1, "slope_30d": -0.1, "drawdown_90d": -2.0, "trend_label": "DOWN"},
+                {"ts": ts, "series_name": "reverse_repo_usage", "pct_change_30d": 8.0, "pct_change_90d": 10.0, "pct_change_365d": 30.0, "zscore_30d": 1.4, "volatility_30d": 0.2, "slope_30d": 0.4, "drawdown_90d": -12.0, "trend_label": "UP"},
                 {"ts": ts, "series_name": "sunspot_number", "pct_change_30d": 13.0, "pct_change_90d": 18.0, "pct_change_365d": 42.0, "zscore_30d": 1.7, "volatility_30d": 0.4, "slope_30d": 0.7, "drawdown_90d": -6.0, "trend_label": "UP"},
                 {"ts": ts, "series_name": "solar_flare_count", "pct_change_30d": 10.0, "pct_change_90d": 15.0, "pct_change_365d": 25.0, "zscore_30d": 1.5, "volatility_30d": 0.3, "slope_30d": 0.4, "drawdown_90d": -4.0, "trend_label": "UP"},
                 {"ts": ts, "series_name": "geomagnetic_kp", "pct_change_30d": 6.0, "pct_change_90d": 4.0, "pct_change_365d": 9.0, "zscore_30d": 0.6, "volatility_30d": 0.2, "slope_30d": 0.1, "drawdown_90d": -3.0, "trend_label": "UP"},
@@ -387,6 +388,7 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertGreaterEqual(len(snapshot["alerts"]), 2)
         self.assertEqual(snapshot["factors"][0]["factor_name"], "liquidity")
         self.assertEqual(snapshot["factors"][0]["direction"], "tightening")
+        self.assertIn(False, [bool(row["passes_filter"]) for row in snapshot["factors"]])
         self.assertEqual(snapshot["market_stress"]["stress_level"], "HIGH")
         self.assertEqual(snapshot["market_stress"]["missing_inputs"], ["credit"])
         self.assertEqual(snapshot["breadth_health"]["breadth_state"], "STRONG")
@@ -396,16 +398,19 @@ class QMISDashboardCLITests(unittest.TestCase):
             "Regime: STAGFLATION RISK | Volatility: MODERATE | Liquidity: EXPANDING | Growth: STABLE | Inflation: HOT",
         )
         self.assertIn("Sun: Pisces", snapshot["intelligence"]["cosmic_state_line"])
-        self.assertEqual(snapshot["intelligence"]["market_drivers"][0]["title"], "Liquidity Tightening")
+        self.assertEqual(len(snapshot["intelligence"]["market_drivers"]), 0)
         self.assertEqual(snapshot["intelligence"]["market_stress"]["stress_level"], "HIGH")
         self.assertEqual(snapshot["intelligence"]["breadth_health"]["breadth_state"], "STRONG")
         self.assertEqual(snapshot["intelligence"]["liquidity_environment"]["liquidity_state"], "EXPANDING")
         self.assertEqual(snapshot["intelligence"]["regime_probabilities"][0]["label"], "LIQUIDITY WITHDRAWAL")
         self.assertEqual(snapshot["intelligence"]["divergences"][0]["title"], "Gold Rising With Yields")
-        self.assertEqual(snapshot["intelligence"]["relationship_shifts"][0]["title"], "Crypto vs Macro Decoupling")
+        self.assertEqual(snapshot["divergences"][0]["persistence_label"], "persistent")
+        self.assertTrue(bool(snapshot["divergences"][0]["passes_filter"]))
+        self.assertIn(True, [bool(row["passes_filter"]) for row in snapshot["anomalies"]])
+        self.assertEqual(snapshot["intelligence"]["relationship_shifts"][0]["title"], "Macro Pricing Shift")
         self.assertEqual(snapshot["intelligence"]["risk_monitor"]["breadth_risk"]["level"], "LOW")
         self.assertEqual(snapshot["intelligence"]["risk_monitor"]["divergence_risk"]["level"], "MODERATE")
-        self.assertEqual(snapshot["intelligence"]["risk_monitor"]["systemic_risk"]["level"], "HIGH")
+        self.assertEqual(snapshot["intelligence"]["risk_monitor"]["systemic_risk"]["level"], "ELEVATED")
 
     def test_render_dashboard_writes_required_sections(self) -> None:
         from qmis.alerts.engine import materialize_alerts
@@ -439,12 +444,11 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertIn("LIQUIDITY ENVIRONMENT", output)
         self.assertIn("EXPANDING", output)
         self.assertIn("PRIMARY MARKET DRIVERS", output)
-        self.assertIn("Liquidity Tightening", output)
-        self.assertIn("Crypto Cycle", output)
+        self.assertIn("No dominant drivers detected", output)
         self.assertIn("CROSS-MARKET DIVERGENCES", output)
         self.assertIn("Gold Rising With Yields", output)
         self.assertIn("RELATIONSHIP SHIFTS", output)
-        self.assertIn("Crypto vs Macro Decoupling", output)
+        self.assertIn("Macro Pricing Shift", output)
         self.assertIn("RISK MONITOR", output)
         self.assertIn("divergence_risk", output)
         self.assertIn("systemic_risk", output)

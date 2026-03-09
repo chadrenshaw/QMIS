@@ -217,8 +217,11 @@ class QMISAPITests(unittest.TestCase):
 
         self.assertEqual(anomalies.status_code, 200)
         self.assertEqual(anomalies.json()["anomalies"][0]["anomaly_type"], "relationship_break")
+        self.assertIn(True, [bool(row["passes_filter"]) for row in anomalies.json()["anomalies"]])
         self.assertEqual(divergences.status_code, 200)
         self.assertEqual(divergences.json()["divergences"][0]["title"], "Gold Rising With Yields")
+        self.assertEqual(divergences.json()["divergences"][0]["persistence_label"], "persistent")
+        self.assertTrue(divergences.json()["divergences"][0]["passes_filter"])
 
         self.assertEqual(alerts.status_code, 200)
         self.assertEqual(alerts.json()["summary"]["status"], "active")
@@ -239,6 +242,9 @@ class QMISAPITests(unittest.TestCase):
         self.assertEqual(dashboard.json()["breadth_health"]["breadth_state"], "WEAKENING")
         self.assertEqual(dashboard.json()["liquidity_environment"]["liquidity_state"], "NEUTRAL")
         self.assertEqual(dashboard.json()["divergences"][0]["title"], "Gold Rising With Yields")
+        self.assertEqual(dashboard.json()["divergences"][0]["persistence_label"], "persistent")
+        self.assertTrue(dashboard.json()["divergences"][0]["passes_filter"])
+        self.assertIn(True, [bool(row["passes_filter"]) for row in dashboard.json()["anomalies"]])
         self.assertIn("market", dashboard.json()["signal_groups"])
         self.assertIn("gold", dashboard.json()["signal_groups"]["market"])
 
