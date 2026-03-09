@@ -55,6 +55,29 @@ steps:
       branch:
         - main
 
+  publish-container-dev-branch:
+    image: woodpeckerci/plugin-docker-buildx
+    depends_on:
+      - verify-container-build
+    settings:
+      registry: gitea.chadlee.org
+      repo: gitea.chadlee.org/${CI_REPO_OWNER}/qmis
+      dockerfile: Dockerfile
+      username:
+        from_secret: REGISTRY_USER
+      password:
+        from_secret: REGISTRY_PASS
+      tags:
+        - dev
+      build_args_from_env:
+        - CI_REPO_URL
+        - CI_COMMIT_SHA
+    when:
+      event:
+        - push
+      branch:
+        - dev
+
   publish-container-tags:
     image: woodpeckerci/plugin-docker-buildx
     depends_on:
@@ -74,3 +97,67 @@ steps:
     when:
       event:
         - tag
+
+  upload-compose-file:
+    image: appleboy/drone-scp
+    depends_on:
+      - publish-container-dev-branch
+    settings:
+      host:
+        from_secret: DEV_DOCKER_HOST_IP
+      username:
+        from_secret: DOCKER_HOST_USER
+      key:
+        from_secret: DOCKER_HOST_SSH_KEY
+      port: 22
+      target: /srv/docker/qmis/
+      source: docker-compose.yml
+    when:
+      event:
+        - push
+      branch:
+        - dev
+
+  upload-deploy-script:
+    image: appleboy/drone-scp
+    depends_on:
+      - publish-container-dev-branch
+    settings:
+      host:
+        from_secret: DEV_DOCKER_HOST_IP
+      username:
+        from_secret: DOCKER_HOST_USER
+      key:
+        from_secret: DOCKER_HOST_SSH_KEY
+      port: 22
+      target: /srv/docker/qmis/
+      source: docker/deploy.sh
+    when:
+      event:
+        - push
+      branch:
+        - dev
+
+  deploy-dev:
+    image: appleboy/drone-ssh
+    depends_on:
+      - upload-compose-file
+      - upload-deploy-script
+    settings:
+      host:
+        from_secret: DEV_DOCKER_HOST_IP
+      username:
+        from_secret: DOCKER_HOST_USER
+      key:
+        from_secret: DOCKER_HOST_SSH_KEY
+      port: 22
+      script:
+        - mkdir -p /srv/docker/qmis/runtime
+        - chmod +x /srv/docker/qmis/deploy.sh
+        - cd /srv/docker/qmis
+        - QMIS_IMAGE=gitea.chadlee.org/${CI_REPO_OWNER}/qmis:dev /srv/docker/qmis/deploy.sh
+    when:
+      event:
+        - push
+      branch:
+        - dev

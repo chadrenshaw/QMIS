@@ -132,6 +132,9 @@ Pipeline behavior:
 - run backend tests with `uv run python -m unittest -v`
 - run frontend tests and production build
 - verify the container build on pull requests, pushes, and tags
+- publish `dev` to `gitea.chadlee.org/crenshaw/qmis` on pushes to `dev`
+- upload `docker-compose.yml` and `docker/deploy.sh` to `infra-docker.zocalo.net:/srv/docker/qmis`
+- execute the remote deploy script from `/srv/docker/qmis` on `dev` pushes
 - publish `latest` to `gitea.chadlee.org/crenshaw/qmis` on pushes to `main`
 - publish semver-style tags to the same Gitea registry on tag events
 
@@ -139,5 +142,12 @@ Required Woodpecker secrets:
 
 - `gitea_registry_username`
 - `gitea_registry_password`
+- `REGISTRY_USER`
+- `REGISTRY_PASS`
+- `DEV_DOCKER_HOST_IP`
+- `DOCKER_HOST_USER`
+- `DOCKER_HOST_SSH_KEY`
 
-These credentials must have permission to push packages to the same Gitea instance that hosts the code repository.
+The registry credentials must have permission to push packages to the same Gitea instance that hosts the code repository.
+
+The remote deploy steps target `infra-docker.zocalo.net` and copy runtime assets into `/srv/docker/qmis` before running `/srv/docker/qmis/deploy.sh`. The script uses that directory as its working directory, pulls `gitea.chadlee.org/crenshaw/qmis:dev`, and restarts the `qmis` service with the checked-in [docker-compose.yml](/Users/crenshaw/Projects/QMIS/docker-compose.yml).
