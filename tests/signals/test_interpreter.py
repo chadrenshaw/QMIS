@@ -236,6 +236,32 @@ class OperatorInterpreterTests(unittest.TestCase):
                     "confidence_label": "exploratory",
                 },
             ],
+            "factors": [
+                {
+                    "factor_name": "liquidity",
+                    "component_rank": 1,
+                    "strength": 0.82,
+                    "direction": "tightening",
+                    "summary": "Fed balance sheet contraction and short-rate pressure are dominating cross-asset moves.",
+                    "supporting_assets": ["fed_balance_sheet", "yield_3m", "reverse_repo_usage"],
+                },
+                {
+                    "factor_name": "crypto",
+                    "component_rank": 2,
+                    "strength": 0.71,
+                    "direction": "bullish",
+                    "summary": "BTCUSD and ETHUSD remain tightly linked inside a crypto-led cycle.",
+                    "supporting_assets": ["BTCUSD", "ETHUSD", "crypto_market_cap"],
+                },
+                {
+                    "factor_name": "volatility",
+                    "component_rank": 3,
+                    "strength": 0.54,
+                    "direction": "stressed",
+                    "summary": "VIX and weak breadth continue to reinforce a volatility regime.",
+                    "supporting_assets": ["vix", "sp500_above_200dma", "new_lows"],
+                },
+            ],
             "anomalies": [
                 {
                     "series_x": "BTCUSD",
@@ -303,7 +329,8 @@ class OperatorInterpreterTests(unittest.TestCase):
         intelligence = build_operator_snapshot(snapshot)
 
         self.assertEqual(len(intelligence["market_drivers"]), 3)
-        self.assertIn("Crypto factor", intelligence["market_drivers"][0]["title"])
+        self.assertEqual(intelligence["market_drivers"][0]["title"], "Liquidity Tightening")
+        self.assertEqual(intelligence["market_drivers"][1]["title"], "Crypto Cycle")
         self.assertEqual(intelligence["relationship_shifts"][0]["title"], "Crypto vs Macro Decoupling")
         self.assertEqual(len(intelligence["warning_signals"]), 3)
         self.assertIn("rising volatility", " ".join(item["title"].lower() for item in intelligence["warning_signals"]))

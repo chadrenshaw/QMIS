@@ -414,6 +414,38 @@ def build_cosmic_state_line(snapshot: dict[str, Any], world_state: dict[str, Any
 
 
 def build_market_drivers(snapshot: dict[str, Any]) -> list[dict[str, str]]:
+    factors = list(snapshot.get("factors") or [])
+    if factors:
+        drivers: list[dict[str, str]] = []
+        for factor in sorted(
+            factors,
+            key=lambda item: (int(item.get("component_rank", 99)), -float(item.get("strength", 0.0))),
+        )[:3]:
+            factor_name = str(factor.get("factor_name", "")).lower()
+            direction = str(factor.get("direction", "")).lower()
+            if factor_name == "liquidity":
+                title = f"Liquidity {direction.title()}" if direction else "Liquidity Regime"
+            elif factor_name == "crypto":
+                title = "Crypto Cycle"
+            elif factor_name == "volatility":
+                title = "Volatility Regime"
+            else:
+                title = factor_name.replace("_", " ").title()
+
+            strength = float(factor.get("strength", 0.0))
+            strength_label = "Strong" if strength >= 0.6 else "Moderate" if strength >= 0.35 else "Developing"
+            supporting_assets = factor.get("supporting_assets", [])
+            if not isinstance(supporting_assets, list):
+                supporting_assets = []
+            summary = str(factor.get("summary") or "").strip()
+            if summary:
+                detail = f"{strength_label} | {summary}"
+            else:
+                assets_label = ", ".join(str(asset) for asset in supporting_assets[:3]) or "supporting assets unavailable"
+                detail = f"{strength_label} | {direction or 'mixed'} | {assets_label}"
+            drivers.append({"title": title, "summary": detail})
+        return drivers
+
     drivers = []
     for force in interpret_market_forces(snapshot)[:3]:
         label = force["title"].replace("Factor", "factor")

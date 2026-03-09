@@ -18,6 +18,7 @@ from qmis.features.normalization import materialize_features
 from qmis.logger import get_logger
 from qmis.scheduling import ANALYSIS_GROUPS, build_schedule_manifest, format_schedule_manifest
 from qmis.signals.correlations import materialize_relationships
+from qmis.signals.factors import materialize_factors
 from qmis.signals.leadlag import materialize_lead_lag_relationships
 from qmis.signals.regime import materialize_regime
 
@@ -62,15 +63,17 @@ def main(argv: list[str] | None = None) -> int:
 
     feature_rows = materialize_features(db_path=config.db_path)
     regime_rows = materialize_regime(db_path=config.db_path)
+    factor_rows = materialize_factors(db_path=config.db_path)
     relationship_rows = materialize_relationships(db_path=config.db_path)
     lead_lag_rows = materialize_lead_lag_relationships(db_path=config.db_path)
     logger.info(
         (
-        "Materialized %s feature rows, %s regime rows, %s relationship rows, "
+        "Materialized %s feature rows, %s regime rows, %s factor rows, %s relationship rows, "
         "and %s lead-lag rows into %s for cadence=%s"
         ),
         feature_rows,
         regime_rows,
+        factor_rows,
         relationship_rows,
         lead_lag_rows,
         config.db_path,
@@ -78,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(
         f"QMIS analysis materialized {feature_rows} feature rows, "
-        f"{regime_rows} regime rows, {relationship_rows} relationship rows, "
+        f"{regime_rows} regime rows, {factor_rows} factor rows, {relationship_rows} relationship rows, "
         f"and {lead_lag_rows} lead-lag rows into {config.db_path} for cadence={args.cadence}"
     )
     return 0

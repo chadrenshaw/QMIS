@@ -34,6 +34,18 @@ SCHEMA_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS factors (
+        ts TIMESTAMP,
+        factor_name TEXT,
+        component_rank INTEGER,
+        strength DOUBLE,
+        direction TEXT,
+        summary TEXT,
+        supporting_assets JSON,
+        loadings JSON
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS relationships (
         ts TIMESTAMP,
         series_x TEXT,

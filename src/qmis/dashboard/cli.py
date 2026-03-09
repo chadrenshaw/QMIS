@@ -164,6 +164,13 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
             LIMIT 1
             """
         ).fetchdf()
+        factor_rows = connection.execute(
+            """
+            SELECT ts, factor_name, component_rank, strength, direction, summary, supporting_assets, loadings
+            FROM factors
+            ORDER BY component_rank ASC, strength DESC
+            """
+        ).fetchdf()
         relationship_rows = connection.execute(
             """
             SELECT
@@ -215,6 +222,19 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         }
         for _, row in signal_rows.iterrows()
     }
+    factors = [
+        {
+            "ts": row["ts"],
+            "factor_name": str(row["factor_name"]),
+            "component_rank": int(row["component_rank"]),
+            "strength": float(row["strength"]),
+            "direction": str(row["direction"]),
+            "summary": str(row["summary"]),
+            "supporting_assets": _parse_metadata(row["supporting_assets"]) if isinstance(row["supporting_assets"], dict) else json.loads(row["supporting_assets"] or "[]"),
+            "loadings": _parse_metadata(row["loadings"]),
+        }
+        for _, row in factor_rows.iterrows()
+    ]
 
     latest_regime = regime_rows.iloc[0].to_dict() if not regime_rows.empty else None
     scores = (
@@ -316,6 +336,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         "scores": scores,
         "score_history": score_history,
         "regime": latest_regime,
+        "factors": factors,
         "yield_curve": yield_curve,
         "yield_curve_state": yield_curve_state,
         "freshness": freshness,
@@ -479,7 +500,7 @@ def _render_cosmic_state(snapshot: dict[str, Any], console: Console) -> None:
 def render_market_forces(snapshot: dict[str, Any], console: Console) -> None:
     drivers = snapshot["intelligence"]["market_drivers"]
     body = "\n".join(f"- {driver['title']}: {driver['summary']}" for driver in drivers) if drivers else "- No dominant drivers detected."
-    console.print(Panel(body, title="MARKET DRIVERS", expand=False))
+    console.print(Panel(body, title="PRIMARY MARKET DRIVERS", expand=False))
 
 
 def render_relationship_changes(snapshot: dict[str, Any], console: Console) -> None:

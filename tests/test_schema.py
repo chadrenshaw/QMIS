@@ -29,7 +29,7 @@ class QMISSchemaTests(unittest.TestCase):
             finally:
                 connection.close()
 
-        self.assertEqual(tables, {"alerts", "collector_runs", "features", "regimes", "relationships", "signals"})
+        self.assertEqual(tables, {"alerts", "collector_runs", "factors", "features", "regimes", "relationships", "signals"})
 
     def test_bootstrap_database_applies_spec_columns(self) -> None:
         from qmis.schema import bootstrap_database
@@ -47,6 +47,10 @@ class QMISSchemaTests(unittest.TestCase):
                 features_columns = {
                     row[1]
                     for row in connection.execute("PRAGMA table_info('features')").fetchall()
+                }
+                factors_columns = {
+                    row[1]
+                    for row in connection.execute("PRAGMA table_info('factors')").fetchall()
                 }
                 relationships_columns = {
                     row[1]
@@ -84,6 +88,19 @@ class QMISSchemaTests(unittest.TestCase):
                 "slope_30d",
                 "drawdown_90d",
                 "trend_label",
+            },
+        )
+        self.assertEqual(
+            factors_columns,
+            {
+                "ts",
+                "factor_name",
+                "component_rank",
+                "strength",
+                "direction",
+                "summary",
+                "supporting_assets",
+                "loadings",
             },
         )
         self.assertEqual(

@@ -92,6 +92,40 @@ class QMISDashboardCLITests(unittest.TestCase):
                 }
             ]
         )
+        factors = pd.DataFrame(
+            [
+                {
+                    "ts": ts,
+                    "factor_name": "liquidity",
+                    "component_rank": 1,
+                    "strength": 0.84,
+                    "direction": "tightening",
+                    "summary": "Fed balance sheet, yield_3m, and reverse_repo_usage are driving a tightening liquidity regime.",
+                    "supporting_assets": json.dumps(["fed_balance_sheet", "yield_3m", "reverse_repo_usage"]),
+                    "loadings": json.dumps({"fed_balance_sheet": -0.77, "yield_3m": 0.74, "reverse_repo_usage": 0.72}),
+                },
+                {
+                    "ts": ts,
+                    "factor_name": "crypto",
+                    "component_rank": 2,
+                    "strength": 0.63,
+                    "direction": "bullish",
+                    "summary": "BTCUSD and ETHUSD remain tightly linked inside a crypto-led cycle.",
+                    "supporting_assets": json.dumps(["BTCUSD", "ETHUSD", "BTC_dominance"]),
+                    "loadings": json.dumps({"BTCUSD": 0.88, "ETHUSD": 0.86, "BTC_dominance": -0.42}),
+                },
+                {
+                    "ts": ts,
+                    "factor_name": "volatility",
+                    "component_rank": 3,
+                    "strength": 0.47,
+                    "direction": "stressed",
+                    "summary": "VIX and breadth deterioration are reinforcing a volatility regime.",
+                    "supporting_assets": json.dumps(["vix", "sp500_above_200dma", "new_lows"]),
+                    "loadings": json.dumps({"vix": 0.83, "sp500_above_200dma": -0.71, "new_lows": 0.66}),
+                },
+            ]
+        )
         relationships = pd.DataFrame(
             [
                 {
@@ -222,6 +256,7 @@ class QMISDashboardCLITests(unittest.TestCase):
             for table_name, payload in (
                 ("signals", signals),
                 ("features", features),
+                ("factors", factors),
                 ("regimes", regimes),
                 ("relationships", relationships),
             ):
@@ -254,12 +289,14 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertEqual(len(snapshot["anomalies"]), 3)
         self.assertEqual(snapshot["alert_summary"]["status"], "active")
         self.assertGreaterEqual(len(snapshot["alerts"]), 2)
+        self.assertEqual(snapshot["factors"][0]["factor_name"], "liquidity")
+        self.assertEqual(snapshot["factors"][0]["direction"], "tightening")
         self.assertEqual(
             snapshot["intelligence"]["global_state_line"],
             "Regime: STAGFLATION RISK | Volatility: MODERATE | Liquidity: NEUTRAL | Growth: STABLE | Inflation: HOT",
         )
         self.assertIn("Sun: Pisces", snapshot["intelligence"]["cosmic_state_line"])
-        self.assertEqual(snapshot["intelligence"]["market_drivers"][0]["title"], "Crypto factor")
+        self.assertEqual(snapshot["intelligence"]["market_drivers"][0]["title"], "Liquidity Tightening")
         self.assertEqual(snapshot["intelligence"]["relationship_shifts"][0]["title"], "Crypto vs Macro Decoupling")
         self.assertEqual(snapshot["intelligence"]["risk_monitor"]["systemic_risk"]["level"], "HIGH")
 
@@ -286,8 +323,9 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertIn("Sun: Pisces", output)
         self.assertIn("Moon: Waning Gibbous", output)
         self.assertIn("Solar: ELEVATED", output)
-        self.assertIn("MARKET DRIVERS", output)
-        self.assertIn("Crypto factor", output)
+        self.assertIn("PRIMARY MARKET DRIVERS", output)
+        self.assertIn("Liquidity Tightening", output)
+        self.assertIn("Crypto Cycle", output)
         self.assertIn("RELATIONSHIP SHIFTS", output)
         self.assertIn("Crypto vs Macro Decoupling", output)
         self.assertIn("RISK MONITOR", output)
