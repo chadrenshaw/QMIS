@@ -121,13 +121,33 @@ class QMISBreadthCollectorTests(unittest.TestCase):
             },
         )
 
-    def test_fetch_breadth_market_download_batches_large_symbol_lists(self) -> None:
+    def test_fetch_breadth_market_download_uses_fast_threaded_primary_path(self) -> None:
+        from qmis.collectors.breadth import fetch_breadth_market_download
+
+        symbols = ["AAA", "BBB", "CCC", "DDD", "EEE"]
+        with mock.patch(
+            "qmis.collectors.breadth.fetch_market_download",
+            return_value=self._build_batch_download(symbols),
+        ) as fetch_download:
+            combined = fetch_breadth_market_download(symbols, period="30d", interval="1d", chunk_size=2)
+
+        fetch_download.assert_called_once_with(
+            period="30d",
+            interval="1d",
+            tickers=symbols,
+            threads=True,
+            timeout_seconds=10,
+        )
+        self.assertEqual(set(combined.columns.get_level_values(0)), set(symbols))
+
+    def test_fetch_breadth_market_download_falls_back_to_safe_batches_after_primary_failure(self) -> None:
         from qmis.collectors.breadth import fetch_breadth_market_download
 
         symbols = ["AAA", "BBB", "CCC", "DDD", "EEE"]
         with mock.patch(
             "qmis.collectors.breadth.fetch_market_download",
             side_effect=[
+                RuntimeError("yfinance primary failed"),
                 self._build_batch_download(["AAA", "BBB"]),
                 self._build_batch_download(["CCC", "DDD"]),
                 self._build_batch_download(["EEE"]),
@@ -135,11 +155,14 @@ class QMISBreadthCollectorTests(unittest.TestCase):
         ) as fetch_download:
             combined = fetch_breadth_market_download(symbols, period="30d", interval="1d", chunk_size=2)
 
-        self.assertEqual(fetch_download.call_count, 3)
+        self.assertEqual(fetch_download.call_count, 4)
+        self.assertEqual(fetch_download.call_args_list[0].kwargs["threads"], True)
         self.assertEqual(
-            [call.kwargs["tickers"] for call in fetch_download.call_args_list],
+            [call.kwargs["tickers"] for call in fetch_download.call_args_list[1:]],
             [["AAA", "BBB"], ["CCC", "DDD"], ["EEE"]],
         )
+        self.assertTrue(all(call.kwargs["threads"] is False for call in fetch_download.call_args_list[1:]))
+        self.assertTrue(all(call.kwargs["timeout_seconds"] == 10 for call in fetch_download.call_args_list))
         self.assertEqual(set(combined.columns.get_level_values(0)), set(symbols))
 
 

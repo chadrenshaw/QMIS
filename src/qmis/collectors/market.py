@@ -9,6 +9,7 @@ from typing import Any
 import pandas as pd
 import yfinance as yf
 
+from qmis.collectors._persistence import replace_signal_rows
 from qmis.schema import bootstrap_database
 from qmis.storage import connect_db, get_default_db_path
 
@@ -28,6 +29,7 @@ def fetch_market_download(
     interval: str = "1d",
     tickers: list[str] | None = None,
     threads: bool = False,
+    timeout_seconds: int = 10,
 ) -> pd.DataFrame:
     """Fetch market history for the spec-defined market assets."""
     return yf.download(
@@ -38,6 +40,7 @@ def fetch_market_download(
         auto_adjust=False,
         progress=False,
         threads=threads,
+        timeout=timeout_seconds,
         multi_level_index=True,
     )
 
@@ -89,19 +92,12 @@ def normalize_market_signals(raw_download: pd.DataFrame) -> pd.DataFrame:
 
 def persist_market_signals(signals: pd.DataFrame, db_path: Path | None = None) -> int:
     """Insert normalized market signals into the DuckDB `signals` table."""
+    if signals.empty:
+        return 0
+
     target_path = bootstrap_database(db_path or get_default_db_path())
     with connect_db(target_path) as connection:
-        payload = signals.copy()
-        connection.register("market_signals_df", payload)
-        connection.execute(
-            """
-            INSERT INTO signals (ts, source, category, series_name, value, unit, metadata)
-            SELECT ts, source, category, series_name, value, unit, metadata
-            FROM market_signals_df
-            """
-        )
-        connection.unregister("market_signals_df")
-    return int(len(signals))
+        return replace_signal_rows(connection, signals, "market_signals_df")
 
 
 def run_market_collector(db_path: Path | None = None, period: str = "400d") -> int:

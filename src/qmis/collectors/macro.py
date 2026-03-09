@@ -11,6 +11,7 @@ from typing import Any
 import pandas as pd
 import requests
 
+from qmis.collectors._persistence import replace_signal_rows
 from qmis.logger import get_logger
 from qmis.schema import bootstrap_database
 from qmis.storage import connect_db, get_default_db_path
@@ -274,17 +275,7 @@ def persist_macro_signals(signals: pd.DataFrame, db_path: Path | None = None) ->
 
     target_path = bootstrap_database(db_path or get_default_db_path())
     with connect_db(target_path) as connection:
-        payload = signals.copy()
-        connection.register("macro_signals_df", payload)
-        connection.execute(
-            """
-            INSERT INTO signals (ts, source, category, series_name, value, unit, metadata)
-            SELECT ts, source, category, series_name, value, unit, metadata
-            FROM macro_signals_df
-            """
-        )
-        connection.unregister("macro_signals_df")
-    return int(len(signals))
+        return replace_signal_rows(connection, signals, "macro_signals_df")
 
 
 def run_macro_collector(db_path: Path | None = None) -> int:

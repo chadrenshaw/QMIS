@@ -10,6 +10,7 @@ from pathlib import Path
 import ephem
 import pandas as pd
 
+from qmis.collectors._persistence import replace_signal_rows
 from qmis.schema import bootstrap_database
 from qmis.storage import connect_db, get_default_db_path
 
@@ -122,17 +123,7 @@ def persist_astronomy_signals(signals: pd.DataFrame, db_path: Path | None = None
 
     target_path = bootstrap_database(db_path or get_default_db_path())
     with connect_db(target_path) as connection:
-        payload = signals.copy()
-        connection.register("astronomy_signals_df", payload)
-        connection.execute(
-            """
-            INSERT INTO signals (ts, source, category, series_name, value, unit, metadata)
-            SELECT ts, source, category, series_name, value, unit, metadata
-            FROM astronomy_signals_df
-            """
-        )
-        connection.unregister("astronomy_signals_df")
-    return int(len(signals))
+        return replace_signal_rows(connection, signals, "astronomy_signals_df")
 
 
 def run_astronomy_collector(db_path: Path | None = None, ts: pd.Timestamp | None = None) -> int:

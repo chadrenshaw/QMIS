@@ -9,6 +9,7 @@ from typing import Any
 import pandas as pd
 import requests
 
+from qmis.collectors._persistence import replace_signal_rows
 from qmis.collectors.macro import MACRO_SERIES, fetch_macro_series
 from qmis.collectors.market import MARKET_SERIES, _extract_close_frame, fetch_market_download
 from qmis.schema import bootstrap_database
@@ -94,17 +95,7 @@ def persist_liquidity_signals(signals: pd.DataFrame, db_path: Path | None = None
 
     target_path = bootstrap_database(db_path or get_default_db_path())
     with connect_db(target_path) as connection:
-        payload = signals.copy()
-        connection.register("liquidity_signals_df", payload)
-        connection.execute(
-            """
-            INSERT INTO signals (ts, source, category, series_name, value, unit, metadata)
-            SELECT ts, source, category, series_name, value, unit, metadata
-            FROM liquidity_signals_df
-            """
-        )
-        connection.unregister("liquidity_signals_df")
-    return int(len(signals))
+        return replace_signal_rows(connection, signals, "liquidity_signals_df")
 
 
 def run_liquidity_collector(db_path: Path | None = None) -> int:

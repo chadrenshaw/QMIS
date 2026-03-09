@@ -10,7 +10,9 @@ from typing import Any
 import pandas as pd
 import requests
 
+from qmis.collectors._persistence import replace_signal_rows
 from qmis.collectors.market import _extract_close_frame, fetch_market_download
+from qmis.logger import get_logger
 from qmis.schema import bootstrap_database
 from qmis.storage import connect_db, get_default_db_path
 
@@ -18,6 +20,7 @@ from qmis.storage import connect_db, get_default_db_path
 SP500_CONSTITUENTS_URL = (
     "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/master/data/constituents.csv"
 )
+LOGGER = get_logger("qmis.collectors.breadth")
 
 
 def normalize_constituent_symbol(symbol: str) -> str:
@@ -43,22 +46,57 @@ def fetch_sp500_constituents(
 
 def fetch_breadth_market_download(
     symbols: list[str],
-    period: str = "450d",
+    period: str = "380d",
     interval: str = "1d",
-    chunk_size: int = 100,
+    chunk_size: int = 60,
+    request_timeout_seconds: int = 10,
 ) -> pd.DataFrame:
     """Fetch constituent price history for breadth calculations."""
     if not symbols:
         return pd.DataFrame()
 
+    try:
+        LOGGER.info("Calling breadth primary download (%s symbols)", len(symbols))
+        fast_download = fetch_market_download(
+            period=period,
+            interval=interval,
+            tickers=symbols,
+            threads=True,
+            timeout_seconds=request_timeout_seconds,
+        )
+        LOGGER.info("Completed breadth primary download (%s symbols)", len(symbols))
+        if not fast_download.empty:
+            return fast_download.sort_index(axis=1)
+    except Exception as exc:
+        LOGGER.warning(
+            "Breadth primary download failed; falling back to safe batches: %s",
+            exc,
+        )
+
+    symbol_batches = [
+        symbols[start_index : start_index + chunk_size]
+        for start_index in range(0, len(symbols), chunk_size)
+    ]
     batches: list[pd.DataFrame] = []
-    for start_index in range(0, len(symbols), chunk_size):
-        batch_symbols = symbols[start_index : start_index + chunk_size]
+    for batch_index, batch_symbols in enumerate(symbol_batches):
+        LOGGER.info(
+            "Calling breadth fallback batch %s/%s (%s symbols)",
+            batch_index + 1,
+            len(symbol_batches),
+            len(batch_symbols),
+        )
         batch_download = fetch_market_download(
             period=period,
             interval=interval,
             tickers=batch_symbols,
             threads=False,
+            timeout_seconds=request_timeout_seconds,
+        )
+        LOGGER.info(
+            "Completed breadth fallback batch %s/%s (%s symbols)",
+            batch_index + 1,
+            len(symbol_batches),
+            len(batch_symbols),
         )
         if not batch_download.empty:
             batches.append(batch_download)
@@ -174,17 +212,7 @@ def persist_breadth_signals(signals: pd.DataFrame, db_path: Path | None = None) 
 
     target_path = bootstrap_database(db_path or get_default_db_path())
     with connect_db(target_path) as connection:
-        payload = signals.copy()
-        connection.register("breadth_signals_df", payload)
-        connection.execute(
-            """
-            INSERT INTO signals (ts, source, category, series_name, value, unit, metadata)
-            SELECT ts, source, category, series_name, value, unit, metadata
-            FROM breadth_signals_df
-            """
-        )
-        connection.unregister("breadth_signals_df")
-    return int(len(signals))
+        return replace_signal_rows(connection, signals, "breadth_signals_df")
 
 
 def run_breadth_collector(
