@@ -103,8 +103,8 @@ steps:
     depends_on:
       - publish-container-dev-branch
     settings:
-      host:
-        from_secret: DEV_DOCKER_HOST_IP
+      host: infra-docker.zocalo.net
+#        from_secret: DEV_DOCKER_HOST_IP
       username:
         from_secret: DOCKER_HOST_USER
       key:
@@ -123,8 +123,8 @@ steps:
     depends_on:
       - publish-container-dev-branch
     settings:
-      host:
-        from_secret: DEV_DOCKER_HOST_IP
+      host: infra-docker.zocalo.net
+#        from_secret: DEV_DOCKER_HOST_IP
       username:
         from_secret: DOCKER_HOST_USER
       key:
@@ -145,8 +145,8 @@ steps:
       - upload-compose-file
       - upload-deploy-script
     settings:
-      host:
-        from_secret: DEV_DOCKER_HOST_IP
+      host: infra-docker.zocalo.net
+#        from_secret: DEV_DOCKER_HOST_IP
       username:
         from_secret: DOCKER_HOST_USER
       key:

@@ -2,7 +2,7 @@ services:
   qmis:
     image: ${QMIS_IMAGE:-gitea.chadlee.org/crenshaw/qmis:latest}
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       PORT: "8000"
       QMIS_DATA_ROOT: /var/lib/qmis
