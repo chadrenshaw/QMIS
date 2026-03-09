@@ -275,38 +275,39 @@ class OperatorInterpreterTests(unittest.TestCase):
             ],
         }
 
-    def test_interpreter_builds_world_state_and_risk_view(self) -> None:
-        from qmis.signals.interpreter import generate_risk_indicators, interpret_world_state
+    def test_interpreter_builds_briefing_summaries(self) -> None:
+        from qmis.signals.interpreter import build_operator_snapshot
 
         snapshot = self._snapshot()
-        world_state = interpret_world_state(snapshot)
-        risk = generate_risk_indicators(snapshot)
+        intelligence = build_operator_snapshot(snapshot)
 
-        self.assertEqual(world_state["sun_sign"], "Pisces")
-        self.assertEqual(world_state["lunar_phase"], "Waning Gibbous")
-        self.assertEqual(len(world_state["solar_activity"]), 3)
-        self.assertEqual(len(world_state["natural_signals"]), 4)
-        self.assertEqual(risk["volatility"]["state"], "stressed")
-        self.assertEqual(risk["liquidity"]["state"], "tightening")
-        self.assertEqual(risk["inflation_pressure"]["state"], "elevated")
-        self.assertEqual(risk["growth_momentum"]["state"], "softening")
-
-    def test_interpreter_groups_forces_breaks_and_watchlist(self) -> None:
-        from qmis.signals.interpreter import (
-            generate_operator_watchlist,
-            interpret_market_forces,
-            summarize_relationship_breaks,
+        self.assertEqual(
+            intelligence["global_state_line"],
+            "Regime: LIQUIDITY WITHDRAWAL | Volatility: HIGH | Liquidity: TIGHT | Growth: WEAK | Inflation: ELEVATED",
         )
+        self.assertIn("Sun: Pisces", intelligence["cosmic_state_line"])
+        self.assertIn("Moon: Waning Gibbous", intelligence["cosmic_state_line"])
+        self.assertIn("Solar: ELEVATED", intelligence["cosmic_state_line"])
+        self.assertEqual([item["label"] for item in intelligence["market_pulse"]], ["Equities", "Crypto", "Energy", "Volatility", "Dollar", "Rates"])
+        self.assertEqual(intelligence["market_pulse"][1]["state"], "DOWN")
+        self.assertEqual(intelligence["risk_monitor"]["volatility_risk"]["level"], "HIGH")
+        self.assertEqual(intelligence["risk_monitor"]["liquidity_risk"]["level"], "HIGH")
+        self.assertEqual(intelligence["risk_monitor"]["growth_risk"]["level"], "HIGH")
+        self.assertEqual(intelligence["risk_monitor"]["systemic_risk"]["level"], "CRITICAL")
+        self.assertTrue(intelligence["experimental_signals"]["visible"])
+
+    def test_interpreter_groups_drivers_shifts_and_warnings(self) -> None:
+        from qmis.signals.interpreter import build_operator_snapshot
 
         snapshot = self._snapshot()
-        forces = interpret_market_forces(snapshot)
-        relationship_changes = summarize_relationship_breaks(snapshot)
-        watchlist = generate_operator_watchlist(snapshot)
+        intelligence = build_operator_snapshot(snapshot)
 
-        self.assertEqual([force["theme"] for force in forces[:3]], ["crypto_factor", "liquidity_factor", "volatility_factor"])
-        self.assertEqual(relationship_changes[0]["title"], "Crypto vs Macro Decoupling")
-        self.assertIn("breadth deterioration", " ".join(item["title"].lower() for item in watchlist))
-        self.assertIn("rising volatility", " ".join(item["title"].lower() for item in watchlist))
+        self.assertEqual(len(intelligence["market_drivers"]), 3)
+        self.assertIn("Crypto factor", intelligence["market_drivers"][0]["title"])
+        self.assertEqual(intelligence["relationship_shifts"][0]["title"], "Crypto vs Macro Decoupling")
+        self.assertEqual(len(intelligence["warning_signals"]), 3)
+        self.assertIn("rising volatility", " ".join(item["title"].lower() for item in intelligence["warning_signals"]))
+        self.assertIn("breadth deterioration", " ".join(item["title"].lower() for item in intelligence["warning_signals"]))
 
 
 if __name__ == "__main__":

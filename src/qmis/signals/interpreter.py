@@ -316,6 +316,169 @@ def generate_risk_indicators(snapshot: dict[str, Any]) -> dict[str, dict[str, An
     }
 
 
+def _risk_level_from_vix(vix: float | None) -> str:
+    if vix is None:
+        return "MODERATE"
+    if vix >= 35.0:
+        return "CRITICAL"
+    if vix >= 25.0:
+        return "HIGH"
+    if vix >= 20.0:
+        return "ELEVATED"
+    if vix >= 15.0:
+        return "MODERATE"
+    return "LOW"
+
+
+def _liquidity_descriptor(snapshot: dict[str, Any]) -> str:
+    risk = generate_risk_indicators(snapshot)
+    state = str(risk["liquidity"]["state"])
+    return {"tightening": "TIGHT", "neutral": "NEUTRAL", "expanding": "EASY"}.get(state, "NEUTRAL")
+
+
+def _growth_descriptor(snapshot: dict[str, Any]) -> str:
+    pmi = _signal_value(snapshot, "pmi")
+    breadth = _signal_value(snapshot, "sp500_above_200dma")
+    if pmi is not None and pmi < 50.0:
+        return "WEAK"
+    if breadth is not None and breadth < 50.0:
+        return "WEAK"
+    if pmi is not None and pmi >= 54.0 and (breadth is None or breadth >= 65.0):
+        return "STRONG"
+    return "STABLE"
+
+
+def _inflation_descriptor(snapshot: dict[str, Any]) -> str:
+    inflation_score = int(snapshot.get("scores", {}).get("inflation_score", 0))
+    if inflation_score >= 3:
+        return "HOT"
+    if inflation_score >= 2:
+        return "ELEVATED"
+    return "NEUTRAL"
+
+
+def _solar_activity_level(snapshot: dict[str, Any]) -> str:
+    sunspots = _signal_value(snapshot, "sunspot_number") or 0.0
+    flares = _signal_value(snapshot, "solar_flare_count") or 0.0
+    flux = _signal_value(snapshot, "solar_flux_f107") or 0.0
+    if sunspots >= 200.0 or flares >= 10.0 or flux >= 180.0:
+        return "HIGH"
+    if sunspots >= 120.0 or flares >= 4.0 or flux >= 120.0:
+        return "ELEVATED"
+    if sunspots >= 60.0 or flares >= 2.0 or flux >= 100.0:
+        return "MODERATE"
+    return "LOW"
+
+
+def build_global_state_line(snapshot: dict[str, Any]) -> str:
+    regime = str(snapshot.get("regime", {}).get("regime_label", "UNKNOWN"))
+    volatility = _risk_level_from_vix(_signal_value(snapshot, "vix"))
+    liquidity = _liquidity_descriptor(snapshot)
+    growth = _growth_descriptor(snapshot)
+    inflation = _inflation_descriptor(snapshot)
+    return (
+        f"Regime: {regime} | Volatility: {volatility} | Liquidity: {liquidity} | "
+        f"Growth: {growth} | Inflation: {inflation}"
+    )
+
+
+def _pulse_state(snapshot: dict[str, Any], series_name: str) -> str:
+    trend = _trend(snapshot, series_name)
+    if trend in {"UP", "DOWN", "SIDEWAYS"}:
+        return trend
+    return "N/A"
+
+
+def build_market_pulse(snapshot: dict[str, Any]) -> list[dict[str, str]]:
+    return [
+        {"label": "Equities", "state": _pulse_state(snapshot, "sp500")},
+        {"label": "Crypto", "state": _pulse_state(snapshot, "BTCUSD")},
+        {"label": "Energy", "state": _pulse_state(snapshot, "oil")},
+        {"label": "Volatility", "state": _pulse_state(snapshot, "vix")},
+        {"label": "Dollar", "state": _pulse_state(snapshot, "dollar_index")},
+        {"label": "Rates", "state": "STABLE" if snapshot.get("yield_curve_state") == "NORMAL" else "INVERTED"},
+    ]
+
+
+def build_cosmic_state_line(snapshot: dict[str, Any], world_state: dict[str, Any] | None = None) -> str:
+    state = world_state or interpret_world_state(snapshot)
+    lunar_cycle_day = state.get("lunar_cycle_day")
+    lunar_illumination = state.get("lunar_illumination")
+    day_display = f"{float(lunar_cycle_day):.1f}" if lunar_cycle_day is not None else "N/A"
+    illumination_display = f"{float(lunar_illumination):.0f}%" if lunar_illumination is not None else "N/A"
+    return (
+        f"Sun: {state['sun_sign']} | Moon: {state['lunar_phase']} | "
+        f"Day: {day_display} | Illumination: {illumination_display} | "
+        f"Solar: {_solar_activity_level(snapshot)}"
+    )
+
+
+def build_market_drivers(snapshot: dict[str, Any]) -> list[dict[str, str]]:
+    drivers = []
+    for force in interpret_market_forces(snapshot)[:3]:
+        label = force["title"].replace("Factor", "factor")
+        direction = "supporting" if force["direction"] == "positive" else "pressuring"
+        lead_pair = force["pairs"][0]["label"] if force["pairs"] else "no lead pair"
+        drivers.append(
+            {
+                "title": label,
+                "summary": f"{label} is {direction} markets via {lead_pair} ({force['strength']:.2f}).",
+            }
+        )
+    return drivers
+
+
+def build_risk_monitor(snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
+    vix = _signal_value(snapshot, "vix")
+    pmi = _signal_value(snapshot, "pmi")
+    breadth = _signal_value(snapshot, "sp500_above_200dma")
+    critical_alerts = sum(1 for alert in snapshot.get("alerts", []) if str(alert.get("severity")) == "critical")
+    anomaly_count = len(snapshot.get("anomalies", []))
+    base_risk = int(snapshot.get("scores", {}).get("risk_score", 0))
+
+    if _liquidity_descriptor(snapshot) == "TIGHT":
+        liquidity_level = "HIGH"
+    elif int(snapshot.get("scores", {}).get("liquidity_score", 0)) >= 3:
+        liquidity_level = "LOW"
+    else:
+        liquidity_level = "MODERATE"
+
+    if pmi is not None and pmi < 48.0 or (breadth is not None and breadth < 50.0):
+        growth_level = "HIGH"
+    elif pmi is not None and pmi < 50.0:
+        growth_level = "ELEVATED"
+    elif pmi is not None and pmi < 52.0:
+        growth_level = "MODERATE"
+    else:
+        growth_level = "LOW"
+
+    systemic_score = base_risk
+    if vix is not None and vix >= 25.0:
+        systemic_score += 1
+    if anomaly_count >= 3:
+        systemic_score += 1
+    if critical_alerts >= 2:
+        systemic_score += 1
+
+    if systemic_score >= 5:
+        systemic_level = "CRITICAL"
+    elif systemic_score >= 4:
+        systemic_level = "HIGH"
+    elif systemic_score >= 3:
+        systemic_level = "ELEVATED"
+    elif systemic_score >= 2:
+        systemic_level = "MODERATE"
+    else:
+        systemic_level = "LOW"
+
+    return {
+        "volatility_risk": {"level": _risk_level_from_vix(vix), "summary": "Derived from the current VIX regime."},
+        "liquidity_risk": {"level": liquidity_level, "summary": "Tracks tightening or easing liquidity conditions."},
+        "growth_risk": {"level": growth_level, "summary": "Blends PMI and breadth participation."},
+        "systemic_risk": {"level": systemic_level, "summary": "Combines base risk score, anomalies, and critical alerts."},
+    }
+
+
 def _select_significant_correlations(snapshot: dict[str, Any], *, experimental_only: bool) -> list[dict[str, Any]]:
     rows_by_pair: dict[tuple[str, str], dict[str, Any]] = {}
     for row in snapshot.get("relationships", []):
@@ -345,9 +508,31 @@ def _select_significant_correlations(snapshot: dict[str, Any], *, experimental_o
 
 
 def _build_experimental_snapshot(snapshot: dict[str, Any], world_state: dict[str, Any]) -> dict[str, Any]:
-    signals = world_state["solar_activity"] + world_state["natural_signals"]
     correlations = _select_significant_correlations(snapshot, experimental_only=True)
-    return {"signals": signals, "correlations": correlations}
+    if not correlations:
+        return {
+            "visible": False,
+            "signals": [],
+            "correlations": [],
+            "summary": "No significant experimental correlations detected.",
+        }
+
+    involved_series = {
+        part
+        for correlation in correlations
+        for part in correlation["pair"].split(" vs ")
+    }
+    signals = [
+        row
+        for row in world_state["solar_activity"] + world_state["natural_signals"]
+        if str(row["series_name"]) in involved_series
+    ]
+    return {
+        "visible": True,
+        "signals": signals,
+        "correlations": correlations,
+        "summary": f"{len(correlations)} significant experimental correlation(s) detected.",
+    }
 
 
 def generate_operator_watchlist(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
@@ -398,15 +583,57 @@ def generate_operator_watchlist(snapshot: dict[str, Any]) -> list[dict[str, Any]
     return deduped
 
 
+def build_warning_signals(snapshot: dict[str, Any]) -> list[dict[str, str]]:
+    warnings: list[dict[str, str]] = []
+    shifts = summarize_relationship_breaks(snapshot)
+    if shifts:
+        warnings.append({"title": shifts[0]["title"], "detail": shifts[0]["summary"]})
+
+    breadth = _signal_value(snapshot, "sp500_above_200dma")
+    if breadth is not None and (breadth < 55.0 or _trend(snapshot, "sp500_above_200dma") == "DOWN"):
+        warnings.append({"title": "Breadth deterioration", "detail": f"Participation has slipped to {breadth:.2f}% above 200DMA."})
+
+    vix = _signal_value(snapshot, "vix")
+    if vix is not None and vix >= 18.0:
+        warnings.append({"title": "Rising volatility", "detail": f"VIX is elevated at {vix:.2f}."})
+
+    if _liquidity_descriptor(snapshot) == "TIGHT":
+        warnings.append({"title": "Tight liquidity", "detail": "Liquidity conditions remain restrictive."})
+
+    deduped: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for warning in warnings:
+        if warning["title"] in seen:
+            continue
+        seen.add(warning["title"])
+        deduped.append(warning)
+        if len(deduped) == 3:
+            break
+    return deduped
+
+
 def build_operator_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     """Compose the full operator intelligence summary from the raw dashboard snapshot."""
     world_state = interpret_world_state(snapshot)
+    market_forces = interpret_market_forces(snapshot)
+    relationship_changes = summarize_relationship_breaks(snapshot)
+    risk_indicators = generate_risk_indicators(snapshot)
+    significant_correlations = _select_significant_correlations(snapshot, experimental_only=False)
+    risk_monitor = build_risk_monitor(snapshot)
+    experimental_signals = _build_experimental_snapshot(snapshot, world_state)
     return {
+        "global_state_line": build_global_state_line(snapshot),
+        "market_pulse": build_market_pulse(snapshot),
+        "cosmic_state_line": build_cosmic_state_line(snapshot, world_state),
+        "market_drivers": build_market_drivers(snapshot),
+        "relationship_shifts": relationship_changes,
+        "risk_monitor": risk_monitor,
+        "warning_signals": build_warning_signals(snapshot),
         "world_state": world_state,
-        "market_forces": interpret_market_forces(snapshot),
-        "relationship_changes": summarize_relationship_breaks(snapshot),
-        "risk_indicators": generate_risk_indicators(snapshot),
-        "significant_correlations": _select_significant_correlations(snapshot, experimental_only=False),
-        "experimental_signals": _build_experimental_snapshot(snapshot, world_state),
+        "market_forces": market_forces,
+        "relationship_changes": relationship_changes,
+        "risk_indicators": risk_indicators,
+        "significant_correlations": significant_correlations,
+        "experimental_signals": experimental_signals,
         "watchlist": generate_operator_watchlist(snapshot),
     }

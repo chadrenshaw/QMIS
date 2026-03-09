@@ -10,19 +10,23 @@ const apiProxyPaths = [
   "/dashboard",
 ];
 
+const apiProxyTarget = process.env.QMIS_API_PROXY_TARGET?.trim();
+
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    proxy: Object.fromEntries(
-      apiProxyPaths.map((path) => [
-        path,
-        {
-          target: "http://127.0.0.1:8000",
-          changeOrigin: true,
-        },
-      ]),
-    ),
+    proxy: apiProxyTarget
+      ? Object.fromEntries(
+          apiProxyPaths.map((path) => [
+            path,
+            {
+              target: apiProxyTarget,
+              changeOrigin: true,
+            },
+          ]),
+        )
+      : undefined,
   },
   preview: {
     port: 4173,

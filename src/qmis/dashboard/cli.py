@@ -463,151 +463,61 @@ def _build_alerts_table(rows: list[dict[str, Any]]) -> Table:
 
 def render_world_snapshot(snapshot: dict[str, Any], console: Console) -> None:
     intelligence = snapshot["intelligence"]
-    world_state = intelligence["world_state"]
+    console.print(Panel(intelligence["global_state_line"], title="GLOBAL STATE", expand=False))
 
-    summary = Table(title="World State Snapshot")
-    summary.add_column("Field")
-    summary.add_column("Value", justify="right")
-    summary.add_row("Sun Sign", str(world_state["sun_sign"]))
-    summary.add_row("Solar Longitude", _format_signal_value(world_state.get("solar_longitude")))
-    summary.add_row("Zodiac Index", str(world_state.get("zodiac_index", "N/A")))
-    summary.add_row("Lunar Phase", str(world_state["lunar_phase"]))
-    summary.add_row("Lunar Cycle Day", _format_signal_value(world_state.get("lunar_cycle_day")))
-    summary.add_row("Lunar Illumination", _format_signal_value(world_state.get("lunar_illumination")))
-    console.print(summary)
 
-    solar_table = Table(title="Solar Activity Metrics")
-    solar_table.add_column("Signal")
-    solar_table.add_column("Value", justify="right")
-    solar_table.add_column("Unit")
-    for row in world_state["solar_activity"]:
-        solar_table.add_row(str(row["series_name"]), _format_signal_value(row.get("value")), str(row["unit"]))
-    if not world_state["solar_activity"]:
-        solar_table.add_row("No data", "-", "-")
-    console.print(solar_table)
+def _render_market_pulse(snapshot: dict[str, Any], console: Console) -> None:
+    pulse = snapshot["intelligence"]["market_pulse"]
+    line = " | ".join(f"{item['label']}: {item['state']}" for item in pulse)
+    console.print(Panel(line, title="MARKET PULSE", expand=False))
 
-    natural_table = Table(title="Natural Signals")
-    natural_table.add_column("Signal")
-    natural_table.add_column("Value", justify="right")
-    natural_table.add_column("Unit")
-    for row in world_state["natural_signals"]:
-        natural_table.add_row(str(row["series_name"]), _format_signal_value(row.get("value")), str(row["unit"]))
-    if not world_state["natural_signals"]:
-        natural_table.add_row("No data", "-", "-")
-    console.print(natural_table)
+
+def _render_cosmic_state(snapshot: dict[str, Any], console: Console) -> None:
+    console.print(Panel(snapshot["intelligence"]["cosmic_state_line"], title="COSMIC STATE", expand=False))
 
 
 def render_market_forces(snapshot: dict[str, Any], console: Console) -> None:
-    forces = snapshot["intelligence"]["market_forces"]
-    table = Table(title="Dominant Market Forces")
-    table.add_column("Theme")
-    table.add_column("Direction")
-    table.add_column("Strength", justify="right")
-    table.add_column("Lead Pair")
-
-    if not forces:
-        table.add_row("No dominant forces", "-", "-", "-")
-    else:
-        for force in forces[:5]:
-            lead_pair = force["pairs"][0]["label"] if force["pairs"] else "-"
-            table.add_row(
-                str(force["theme"]),
-                str(force["direction"]),
-                f"{float(force['strength']):.2f}",
-                lead_pair,
-            )
-    console.print(table)
+    drivers = snapshot["intelligence"]["market_drivers"]
+    body = "\n".join(f"- {driver['title']}: {driver['summary']}" for driver in drivers) if drivers else "- No dominant drivers detected."
+    console.print(Panel(body, title="MARKET DRIVERS", expand=False))
 
 
 def render_relationship_changes(snapshot: dict[str, Any], console: Console) -> None:
-    rows = snapshot["intelligence"]["relationship_changes"]
-    table = Table(title="Key Relationship Changes")
-    table.add_column("Summary")
-    table.add_column("Breaks", justify="right")
-    table.add_column("Detail")
-
-    if not rows:
-        table.add_row("No material relationship breaks", "0", "-")
-    else:
-        for row in rows[:5]:
-            table.add_row(str(row["title"]), str(int(row["count"])), str(row["summary"]))
-    console.print(table)
+    rows = snapshot["intelligence"]["relationship_shifts"]
+    body = "\n".join(f"- {row['title']}: {row['summary']}" for row in rows[:4]) if rows else "- No material relationship shifts."
+    console.print(Panel(body, title="RELATIONSHIP SHIFTS", expand=False))
 
 
 def render_risk_indicators(snapshot: dict[str, Any], console: Console) -> None:
-    rows = snapshot["intelligence"]["risk_indicators"]
-    table = Table(title="Macro Risk Indicators")
-    table.add_column("Indicator")
-    table.add_column("State")
-    table.add_column("Value", justify="right")
-    table.add_column("Interpretation")
-
-    for key in ("volatility", "liquidity", "inflation_pressure", "growth_momentum"):
-        row = rows.get(key, {})
-        value = row.get("value")
-        display_value = _format_signal_value(value) if isinstance(value, (int, float)) else str(value or "N/A")
-        table.add_row(key, str(row.get("state", "unknown")), display_value, str(row.get("summary", "-")))
-    console.print(table)
-
-
-def _render_significant_correlations(snapshot: dict[str, Any], console: Console) -> None:
-    rows = snapshot["intelligence"]["significant_correlations"]
-    table = Table(title="Significant Correlations")
-    table.add_column("Pair")
-    table.add_column("Corr", justify="right")
-    table.add_column("Window", justify="right")
-    table.add_column("p-value", justify="right")
-
-    if not rows:
-        table.add_row("No significant correlations", "-", "-", "-")
-    else:
-        for row in rows[:6]:
-            table.add_row(
-                str(row["pair"]),
-                f"{float(row['correlation']):.2f}",
-                str(int(row["window_days"])),
-                f"{float(row['p_value']):.4f}",
-            )
-    console.print(table)
+    rows = snapshot["intelligence"]["risk_monitor"]
+    body = "\n".join(f"- {key}: {row['level']} | {row['summary']}" for key, row in rows.items())
+    console.print(Panel(body, title="RISK MONITOR", expand=False))
 
 
 def _render_experimental_signals(snapshot: dict[str, Any], console: Console) -> None:
     experimental = snapshot["intelligence"]["experimental_signals"]
-    table = Table(title="Experimental Signals")
-    table.add_column("Signal")
-    table.add_column("Value", justify="right")
-    table.add_column("Unit")
+    if not experimental["visible"]:
+        console.print(Panel(str(experimental["summary"]), title="EXPERIMENTAL SIGNALS", expand=False))
+        return
 
-    if not experimental["signals"]:
-        table.add_row("No experimental signals", "-", "-")
-    else:
-        for row in experimental["signals"][:8]:
-            table.add_row(str(row["series_name"]), _format_signal_value(row.get("value")), str(row["unit"]))
-    console.print(table)
-
-    correlation_table = Table(title="Experimental Correlations")
-    correlation_table.add_column("Pair")
-    correlation_table.add_column("Corr", justify="right")
-    if not experimental["correlations"]:
-        correlation_table.add_row("No strong experimental correlations", "-")
-    else:
-        for row in experimental["correlations"][:4]:
-            correlation_table.add_row(str(row["pair"]), f"{float(row['correlation']):.2f}")
-    console.print(correlation_table)
+    signal_lines = [
+        f"{row['series_name']}: {_format_signal_value(row.get('value'))} {row['unit']}"
+        for row in experimental["signals"]
+    ]
+    correlation_lines = [
+        f"{row['pair']} ({row['correlation']:.2f})"
+        for row in experimental["correlations"][:4]
+    ]
+    body = "\n".join(
+        ["Signals:"] + [f"- {line}" for line in signal_lines] + ["Correlations:"] + [f"- {line}" for line in correlation_lines]
+    )
+    console.print(Panel(body, title="EXPERIMENTAL SIGNALS", expand=False))
 
 
 def render_watchlist(snapshot: dict[str, Any], console: Console) -> None:
-    watchlist = snapshot["intelligence"]["watchlist"]
-    table = Table(title="What To Watch")
-    table.add_column("Item")
-    table.add_column("Why It Matters")
-
-    if not watchlist:
-        table.add_row("No watch items", "-")
-    else:
-        for item in watchlist:
-            table.add_row(str(item["title"]), str(item["detail"]))
-    console.print(table)
+    warnings = snapshot["intelligence"]["warning_signals"]
+    body = "\n".join(f"- {item['title']}: {item['detail']}" for item in warnings) if warnings else "- No immediate warning signals."
+    console.print(Panel(body, title="WARNING SIGNALS", expand=False))
 
 
 def render_dashboard(snapshot: dict[str, Any], console: Console | None = None) -> None:
@@ -615,15 +525,11 @@ def render_dashboard(snapshot: dict[str, Any], console: Console | None = None) -
     console = console or Console()
     title = Text("OPERATOR INTELLIGENCE SNAPSHOT", style="bold")
     console.print(Panel(title, expand=False))
-    regime_label = snapshot["regime"]["regime_label"] if snapshot["regime"] else "N/A"
-    confidence = snapshot["regime"]["confidence"] if snapshot["regime"] else None
-    regime_text = regime_label if confidence is None else f"{regime_label}\nConfidence: {confidence:.2f}"
     render_world_snapshot(snapshot, console)
-    console.print(Panel(regime_text, title="Macro Regime", expand=False))
+    _render_market_pulse(snapshot, console)
+    _render_cosmic_state(snapshot, console)
     render_market_forces(snapshot, console)
     render_relationship_changes(snapshot, console)
     render_risk_indicators(snapshot, console)
-    _render_significant_correlations(snapshot, console)
-    _render_experimental_signals(snapshot, console)
     render_watchlist(snapshot, console)
-    console.print(_build_alerts_table(snapshot["alerts"]))
+    _render_experimental_signals(snapshot, console)

@@ -254,11 +254,14 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertEqual(len(snapshot["anomalies"]), 3)
         self.assertEqual(snapshot["alert_summary"]["status"], "active")
         self.assertGreaterEqual(len(snapshot["alerts"]), 2)
-        self.assertEqual(snapshot["intelligence"]["world_state"]["sun_sign"], "Pisces")
-        self.assertEqual(snapshot["intelligence"]["world_state"]["lunar_phase"], "Waning Gibbous")
-        self.assertEqual(snapshot["intelligence"]["market_forces"][0]["theme"], "crypto_factor")
-        self.assertEqual(snapshot["intelligence"]["relationship_changes"][0]["title"], "Crypto vs Macro Decoupling")
-        self.assertIn("volatility", snapshot["intelligence"]["risk_indicators"])
+        self.assertEqual(
+            snapshot["intelligence"]["global_state_line"],
+            "Regime: STAGFLATION RISK | Volatility: MODERATE | Liquidity: NEUTRAL | Growth: STABLE | Inflation: HOT",
+        )
+        self.assertIn("Sun: Pisces", snapshot["intelligence"]["cosmic_state_line"])
+        self.assertEqual(snapshot["intelligence"]["market_drivers"][0]["title"], "Crypto factor")
+        self.assertEqual(snapshot["intelligence"]["relationship_shifts"][0]["title"], "Crypto vs Macro Decoupling")
+        self.assertEqual(snapshot["intelligence"]["risk_monitor"]["systemic_risk"]["level"], "HIGH")
 
     def test_render_dashboard_writes_required_sections(self) -> None:
         from qmis.alerts.engine import materialize_alerts
@@ -276,21 +279,23 @@ class QMISDashboardCLITests(unittest.TestCase):
 
         output = buffer.getvalue()
         self.assertIn("OPERATOR INTELLIGENCE SNAPSHOT", output)
-        self.assertIn("World State Snapshot", output)
-        self.assertIn("Pisces", output)
-        self.assertIn("Waning Gibbous", output)
-        self.assertIn("Macro Regime", output)
-        self.assertIn("STAGFLATION RISK", output)
-        self.assertIn("Dominant Market Forces", output)
-        self.assertIn("liquidity_factor", output)
-        self.assertIn("Key Relationship Changes", output)
+        self.assertIn("GLOBAL STATE", output)
+        self.assertIn("Regime: STAGFLATION RISK", output)
+        self.assertIn("MARKET PULSE", output)
+        self.assertIn("COSMIC STATE", output)
+        self.assertIn("Sun: Pisces", output)
+        self.assertIn("Moon: Waning Gibbous", output)
+        self.assertIn("Solar: ELEVATED", output)
+        self.assertIn("MARKET DRIVERS", output)
+        self.assertIn("Crypto factor", output)
+        self.assertIn("RELATIONSHIP SHIFTS", output)
         self.assertIn("Crypto vs Macro Decoupling", output)
-        self.assertIn("Macro Risk Indicators", output)
-        self.assertIn("Significant Correlations", output)
-        self.assertIn("Experimental Signals", output)
+        self.assertIn("RISK MONITOR", output)
+        self.assertIn("systemic_risk", output)
+        self.assertIn("WARNING SIGNALS", output)
+        self.assertIn("EXPERIMENTAL SIGNALS", output)
+        self.assertIn("STAGFLATION RISK", output)
         self.assertIn("sunspot_number", output)
-        self.assertIn("What To Watch", output)
-        self.assertIn("Alerts", output)
 
 
 if __name__ == "__main__":
