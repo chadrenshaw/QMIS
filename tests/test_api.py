@@ -106,11 +106,24 @@ class QMISAPITests(unittest.TestCase):
                 },
             ]
         )
+        stress = pd.DataFrame(
+            [
+                {
+                    "ts": ts,
+                    "stress_score": 61.0,
+                    "stress_level": "HIGH",
+                    "summary": "Market stress is HIGH with elevated volatility and breadth deterioration.",
+                    "components": '{"vix_level": 0.75, "yield_curve": 0.20, "breadth": 0.66, "anomaly_pressure": 0.40}',
+                    "missing_inputs": '["credit"]',
+                }
+            ]
+        )
 
         with connect_db(db_path) as connection:
             for table_name, payload in (
                 ("signals", signals),
                 ("features", features),
+                ("stress_snapshots", stress),
                 ("regimes", regimes),
                 ("relationships", relationships),
             ):
@@ -164,6 +177,8 @@ class QMISAPITests(unittest.TestCase):
         self.assertEqual(len(dashboard.json()["score_history"]), 2)
         self.assertEqual(dashboard.json()["alert_summary"]["status"], "active")
         self.assertGreaterEqual(len(dashboard.json()["alerts"]), 3)
+        self.assertEqual(dashboard.json()["market_stress"]["stress_level"], "HIGH")
+        self.assertEqual(dashboard.json()["market_stress"]["missing_inputs"], ["credit"])
         self.assertIn("market", dashboard.json()["signal_groups"])
         self.assertIn("gold", dashboard.json()["signal_groups"]["market"])
 

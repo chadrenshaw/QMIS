@@ -657,6 +657,7 @@ def build_operator_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "global_state_line": build_global_state_line(snapshot),
         "market_pulse": build_market_pulse(snapshot),
         "cosmic_state_line": build_cosmic_state_line(snapshot, world_state),
+        "market_stress": snapshot.get("market_stress"),
         "market_drivers": build_market_drivers(snapshot),
         "relationship_shifts": relationship_changes,
         "risk_monitor": risk_monitor,

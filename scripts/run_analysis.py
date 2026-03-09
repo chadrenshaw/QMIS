@@ -21,6 +21,7 @@ from qmis.signals.correlations import materialize_relationships
 from qmis.signals.factors import materialize_factors
 from qmis.signals.leadlag import materialize_lead_lag_relationships
 from qmis.signals.regime import materialize_regime
+from qmis.signals.stress import materialize_market_stress
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -65,16 +66,18 @@ def main(argv: list[str] | None = None) -> int:
     regime_rows = materialize_regime(db_path=config.db_path)
     factor_rows = materialize_factors(db_path=config.db_path)
     relationship_rows = materialize_relationships(db_path=config.db_path)
+    stress_rows = materialize_market_stress(db_path=config.db_path)
     lead_lag_rows = materialize_lead_lag_relationships(db_path=config.db_path)
     logger.info(
         (
         "Materialized %s feature rows, %s regime rows, %s factor rows, %s relationship rows, "
-        "and %s lead-lag rows into %s for cadence=%s"
+        "%s stress rows, and %s lead-lag rows into %s for cadence=%s"
         ),
         feature_rows,
         regime_rows,
         factor_rows,
         relationship_rows,
+        stress_rows,
         lead_lag_rows,
         config.db_path,
         args.cadence,
@@ -82,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"QMIS analysis materialized {feature_rows} feature rows, "
         f"{regime_rows} regime rows, {factor_rows} factor rows, {relationship_rows} relationship rows, "
-        f"and {lead_lag_rows} lead-lag rows into {config.db_path} for cadence={args.cadence}"
+        f"{stress_rows} stress rows, and {lead_lag_rows} lead-lag rows into {config.db_path} for cadence={args.cadence}"
     )
     return 0
 

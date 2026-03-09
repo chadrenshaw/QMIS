@@ -262,6 +262,19 @@ class OperatorInterpreterTests(unittest.TestCase):
                     "supporting_assets": ["vix", "sp500_above_200dma", "new_lows"],
                 },
             ],
+            "market_stress": {
+                "stress_score": 74.0,
+                "stress_level": "HIGH",
+                "summary": "Market stress is HIGH with elevated VIX, inverted rates, and breadth deterioration.",
+                "components": {
+                    "vix_level": 0.72,
+                    "vix_spike": 0.70,
+                    "yield_curve": 0.53,
+                    "breadth": 0.68,
+                    "anomaly_pressure": 0.80,
+                },
+                "missing_inputs": ["credit"],
+            },
             "anomalies": [
                 {
                     "series_x": "BTCUSD",
@@ -320,6 +333,8 @@ class OperatorInterpreterTests(unittest.TestCase):
         self.assertEqual(intelligence["risk_monitor"]["liquidity_risk"]["level"], "HIGH")
         self.assertEqual(intelligence["risk_monitor"]["growth_risk"]["level"], "HIGH")
         self.assertEqual(intelligence["risk_monitor"]["systemic_risk"]["level"], "CRITICAL")
+        self.assertEqual(intelligence["market_stress"]["stress_level"], "HIGH")
+        self.assertIn("breadth", intelligence["market_stress"]["summary"].lower())
         self.assertTrue(intelligence["experimental_signals"]["visible"])
 
     def test_interpreter_groups_drivers_shifts_and_warnings(self) -> None:

@@ -173,6 +173,7 @@ def create_app(db_path: Path | None = None, web_dist_dir: Path | None = None) ->
             "scores": snapshot["scores"],
             "score_history": [_serialize_record(point) for point in snapshot["score_history"]],
             "regime": _serialize_record(snapshot["regime"]) if snapshot["regime"] else None,
+            "market_stress": _serialize_record(snapshot["market_stress"]) if snapshot["market_stress"] else None,
             "yield_curve": snapshot["yield_curve"],
             "yield_curve_state": snapshot["yield_curve_state"],
             "freshness": _serialize_record(snapshot["freshness"]),

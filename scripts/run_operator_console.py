@@ -37,6 +37,7 @@ from qmis.signals.correlations import materialize_relationships
 from qmis.signals.factors import materialize_factors
 from qmis.signals.leadlag import materialize_lead_lag_relationships
 from qmis.signals.regime import materialize_regime
+from qmis.signals.stress import materialize_market_stress
 from qmis.storage import connect_db
 
 
@@ -334,6 +335,7 @@ def _refresh_pipeline(
         "regime": int(materialize_regime(db_path=db_path)),
         "factors": int(materialize_factors(db_path=db_path)),
         "relationships": int(materialize_relationships(db_path=db_path)),
+        "stress": int(materialize_market_stress(db_path=db_path)),
         "lead_lag": int(materialize_lead_lag_relationships(db_path=db_path)),
         "alerts": int(materialize_alerts(db_path=db_path)),
     }
@@ -346,7 +348,7 @@ def _render_refresh_summary(summary: dict[str, int | dict[str, int]], console: C
     message = (
         "Refresh complete\n"
         f"Collectors: {collector_text}\n"
-        f"Features: {summary['features']}  Regime: {summary['regime']}  Factors: {summary['factors']}  "
+        f"Features: {summary['features']}  Regime: {summary['regime']}  Factors: {summary['factors']}  Stress: {summary['stress']}  "
         f"Relationships: {summary['relationships']}  Lead-lag: {summary['lead_lag']}  Alerts: {summary['alerts']}"
     )
     failures = summary.get("collector_failures", [])
@@ -364,7 +366,7 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
     if args.dry_run:
         message = (
             f"QMIS operator console dry-run: repo={config.repo_root} db={config.db_path} "
-            "collectors=all analysis=features,regime,factors,relationships,lead-lag alerts=materialize dashboard=render"
+            "collectors=all analysis=features,regime,factors,relationships,stress,lead-lag alerts=materialize dashboard=render"
         )
         logger.info(message)
         print(message)

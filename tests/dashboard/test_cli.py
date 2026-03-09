@@ -126,6 +126,26 @@ class QMISDashboardCLITests(unittest.TestCase):
                 },
             ]
         )
+        stress = pd.DataFrame(
+            [
+                {
+                    "ts": ts,
+                    "stress_score": 68.0,
+                    "stress_level": "HIGH",
+                    "summary": "Market stress is HIGH with VIX pressure, inverted curve stress, and weak breadth.",
+                    "components": json.dumps(
+                        {
+                            "vix_level": 0.82,
+                            "vix_spike": 0.55,
+                            "yield_curve": 0.53,
+                            "breadth": 0.64,
+                            "anomaly_pressure": 0.60,
+                        }
+                    ),
+                    "missing_inputs": json.dumps(["credit"]),
+                }
+            ]
+        )
         relationships = pd.DataFrame(
             [
                 {
@@ -257,6 +277,7 @@ class QMISDashboardCLITests(unittest.TestCase):
                 ("signals", signals),
                 ("features", features),
                 ("factors", factors),
+                ("stress_snapshots", stress),
                 ("regimes", regimes),
                 ("relationships", relationships),
             ):
@@ -291,12 +312,15 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertGreaterEqual(len(snapshot["alerts"]), 2)
         self.assertEqual(snapshot["factors"][0]["factor_name"], "liquidity")
         self.assertEqual(snapshot["factors"][0]["direction"], "tightening")
+        self.assertEqual(snapshot["market_stress"]["stress_level"], "HIGH")
+        self.assertEqual(snapshot["market_stress"]["missing_inputs"], ["credit"])
         self.assertEqual(
             snapshot["intelligence"]["global_state_line"],
             "Regime: STAGFLATION RISK | Volatility: MODERATE | Liquidity: NEUTRAL | Growth: STABLE | Inflation: HOT",
         )
         self.assertIn("Sun: Pisces", snapshot["intelligence"]["cosmic_state_line"])
         self.assertEqual(snapshot["intelligence"]["market_drivers"][0]["title"], "Liquidity Tightening")
+        self.assertEqual(snapshot["intelligence"]["market_stress"]["stress_level"], "HIGH")
         self.assertEqual(snapshot["intelligence"]["relationship_shifts"][0]["title"], "Crypto vs Macro Decoupling")
         self.assertEqual(snapshot["intelligence"]["risk_monitor"]["systemic_risk"]["level"], "HIGH")
 
@@ -323,6 +347,8 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertIn("Sun: Pisces", output)
         self.assertIn("Moon: Waning Gibbous", output)
         self.assertIn("Solar: ELEVATED", output)
+        self.assertIn("MARKET STRESS", output)
+        self.assertIn("HIGH", output)
         self.assertIn("PRIMARY MARKET DRIVERS", output)
         self.assertIn("Liquidity Tightening", output)
         self.assertIn("Crypto Cycle", output)

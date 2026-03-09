@@ -62,6 +62,19 @@ def _parse_metadata(value: Any) -> dict[str, Any]:
     return {}
 
 
+def _parse_json_list(value: Any) -> list[Any]:
+    if isinstance(value, list):
+        return list(value)
+    if isinstance(value, str) and value:
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+        if isinstance(parsed, list):
+            return parsed
+    return []
+
+
 def _latest_rows(connection, table_name: str, value_columns: str = "*"):
     return connection.execute(
         f"""
@@ -91,12 +104,14 @@ def _build_freshness(
     latest_signal_ts: Any,
     latest_regime_ts: Any,
     latest_relationship_ts: Any,
+    latest_stress_ts: Any,
 ) -> dict[str, Any]:
     timestamps = [
         ts for ts in (
             _coerce_timestamp(latest_signal_ts),
             _coerce_timestamp(latest_regime_ts),
             _coerce_timestamp(latest_relationship_ts),
+            _coerce_timestamp(latest_stress_ts),
         )
         if ts is not None
     ]
@@ -106,6 +121,7 @@ def _build_freshness(
             "latest_signal_ts": latest_signal_ts,
             "latest_regime_ts": latest_regime_ts,
             "latest_relationship_ts": latest_relationship_ts,
+            "latest_stress_ts": latest_stress_ts,
         }
 
     newest = max(timestamps)
@@ -116,6 +132,7 @@ def _build_freshness(
         "latest_signal_ts": latest_signal_ts,
         "latest_regime_ts": latest_regime_ts,
         "latest_relationship_ts": latest_relationship_ts,
+        "latest_stress_ts": latest_stress_ts,
         "age_days": age_days,
     }
 
@@ -169,6 +186,14 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
             SELECT ts, factor_name, component_rank, strength, direction, summary, supporting_assets, loadings
             FROM factors
             ORDER BY component_rank ASC, strength DESC
+            """
+        ).fetchdf()
+        stress_rows = connection.execute(
+            """
+            SELECT ts, stress_score, stress_level, summary, components, missing_inputs
+            FROM stress_snapshots
+            ORDER BY ts DESC
+            LIMIT 1
             """
         ).fetchdf()
         relationship_rows = connection.execute(
@@ -235,6 +260,18 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         }
         for _, row in factor_rows.iterrows()
     ]
+    market_stress = (
+        {
+            "ts": stress_rows.iloc[0]["ts"],
+            "stress_score": float(stress_rows.iloc[0]["stress_score"]),
+            "stress_level": str(stress_rows.iloc[0]["stress_level"]),
+            "summary": str(stress_rows.iloc[0]["summary"]),
+            "components": _parse_metadata(stress_rows.iloc[0]["components"]),
+            "missing_inputs": _parse_json_list(stress_rows.iloc[0]["missing_inputs"]),
+        }
+        if not stress_rows.empty
+        else None
+    )
 
     latest_regime = regime_rows.iloc[0].to_dict() if not regime_rows.empty else None
     scores = (
@@ -312,6 +349,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         latest_signal_ts=signal_rows["ts"].max() if not signal_rows.empty else None,
         latest_regime_ts=regime_rows["ts"].max() if not regime_rows.empty else None,
         latest_relationship_ts=relationship_rows["ts"].max() if not relationship_rows.empty else None,
+        latest_stress_ts=stress_rows["ts"].max() if not stress_rows.empty else None,
     )
     latest_snapshot_ts = max(
         (
@@ -320,6 +358,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
                 signal_rows["ts"].max() if not signal_rows.empty else None,
                 regime_rows["ts"].max() if not regime_rows.empty else None,
                 relationship_rows["ts"].max() if not relationship_rows.empty else None,
+                stress_rows["ts"].max() if not stress_rows.empty else None,
             )
             if ts is not None
         ),
@@ -337,6 +376,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         "score_history": score_history,
         "regime": latest_regime,
         "factors": factors,
+        "market_stress": market_stress,
         "yield_curve": yield_curve,
         "yield_curve_state": yield_curve_state,
         "freshness": freshness,
@@ -497,6 +537,17 @@ def _render_cosmic_state(snapshot: dict[str, Any], console: Console) -> None:
     console.print(Panel(snapshot["intelligence"]["cosmic_state_line"], title="COSMIC STATE", expand=False))
 
 
+def render_market_stress(snapshot: dict[str, Any], console: Console) -> None:
+    stress = snapshot["intelligence"].get("market_stress")
+    if not stress:
+        console.print(Panel("No market stress snapshot available.", title="MARKET STRESS", expand=False))
+        return
+    missing_inputs = stress.get("missing_inputs", [])
+    missing_text = f"\nMissing inputs: {', '.join(missing_inputs)}" if missing_inputs else ""
+    body = f"{stress['stress_level']} ({float(stress['stress_score']):.1f})\n{stress['summary']}{missing_text}"
+    console.print(Panel(body, title="MARKET STRESS", expand=False))
+
+
 def render_market_forces(snapshot: dict[str, Any], console: Console) -> None:
     drivers = snapshot["intelligence"]["market_drivers"]
     body = "\n".join(f"- {driver['title']}: {driver['summary']}" for driver in drivers) if drivers else "- No dominant drivers detected."
@@ -549,6 +600,7 @@ def render_dashboard(snapshot: dict[str, Any], console: Console | None = None) -
     render_world_snapshot(snapshot, console)
     _render_market_pulse(snapshot, console)
     _render_cosmic_state(snapshot, console)
+    render_market_stress(snapshot, console)
     render_market_forces(snapshot, console)
     render_relationship_changes(snapshot, console)
     render_risk_indicators(snapshot, console)

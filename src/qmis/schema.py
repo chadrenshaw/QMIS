@@ -46,6 +46,16 @@ SCHEMA_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS stress_snapshots (
+        ts TIMESTAMP,
+        stress_score DOUBLE,
+        stress_level TEXT,
+        summary TEXT,
+        components JSON,
+        missing_inputs JSON
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS relationships (
         ts TIMESTAMP,
         series_x TEXT,

@@ -29,7 +29,7 @@ class QMISSchemaTests(unittest.TestCase):
             finally:
                 connection.close()
 
-        self.assertEqual(tables, {"alerts", "collector_runs", "factors", "features", "regimes", "relationships", "signals"})
+        self.assertEqual(tables, {"alerts", "collector_runs", "factors", "features", "regimes", "relationships", "signals", "stress_snapshots"})
 
     def test_bootstrap_database_applies_spec_columns(self) -> None:
         from qmis.schema import bootstrap_database
@@ -51,6 +51,10 @@ class QMISSchemaTests(unittest.TestCase):
                 factors_columns = {
                     row[1]
                     for row in connection.execute("PRAGMA table_info('factors')").fetchall()
+                }
+                stress_columns = {
+                    row[1]
+                    for row in connection.execute("PRAGMA table_info('stress_snapshots')").fetchall()
                 }
                 relationships_columns = {
                     row[1]
@@ -101,6 +105,17 @@ class QMISSchemaTests(unittest.TestCase):
                 "summary",
                 "supporting_assets",
                 "loadings",
+            },
+        )
+        self.assertEqual(
+            stress_columns,
+            {
+                "ts",
+                "stress_score",
+                "stress_level",
+                "summary",
+                "components",
+                "missing_inputs",
             },
         )
         self.assertEqual(
