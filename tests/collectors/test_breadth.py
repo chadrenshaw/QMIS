@@ -40,6 +40,15 @@ class QMISBreadthCollectorTests(unittest.TestCase):
         frame.columns = pd.MultiIndex.from_tuples(frame.columns)
         return frame
 
+    def _build_batch_download(self, symbols: list[str]) -> pd.DataFrame:
+        index = pd.to_datetime(["2026-03-05", "2026-03-06"])
+        payload: dict[tuple[str, str], list[float]] = {}
+        for offset, symbol in enumerate(symbols, start=1):
+            payload[(symbol, "Close")] = [10.0 + offset, 11.0 + offset]
+        frame = pd.DataFrame(payload, index=index)
+        frame.columns = pd.MultiIndex.from_tuples(frame.columns)
+        return frame
+
     def test_calculate_breadth_signals_derives_spec_metrics(self) -> None:
         from qmis.collectors.breadth import calculate_breadth_signals
 
@@ -111,6 +120,27 @@ class QMISBreadthCollectorTests(unittest.TestCase):
                 "unit": "count",
             },
         )
+
+    def test_fetch_breadth_market_download_batches_large_symbol_lists(self) -> None:
+        from qmis.collectors.breadth import fetch_breadth_market_download
+
+        symbols = ["AAA", "BBB", "CCC", "DDD", "EEE"]
+        with mock.patch(
+            "qmis.collectors.breadth.fetch_market_download",
+            side_effect=[
+                self._build_batch_download(["AAA", "BBB"]),
+                self._build_batch_download(["CCC", "DDD"]),
+                self._build_batch_download(["EEE"]),
+            ],
+        ) as fetch_download:
+            combined = fetch_breadth_market_download(symbols, period="30d", interval="1d", chunk_size=2)
+
+        self.assertEqual(fetch_download.call_count, 3)
+        self.assertEqual(
+            [call.kwargs["tickers"] for call in fetch_download.call_args_list],
+            [["AAA", "BBB"], ["CCC", "DDD"], ["EEE"]],
+        )
+        self.assertEqual(set(combined.columns.get_level_values(0)), set(symbols))
 
 
 if __name__ == "__main__":

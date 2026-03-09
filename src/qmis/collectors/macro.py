@@ -17,7 +17,15 @@ from qmis.storage import connect_db, get_default_db_path
 
 
 LOGGER = get_logger("qmis.collectors.macro")
+FRED_API_OBSERVATIONS_URL = "https://api.stlouisfed.org/fred/series/observations"
 FRED_GRAPH_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
+TREASURY_YIELD_CSV_URL_TEMPLATE = (
+    "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/{year}/all"
+)
+TREASURY_YIELD_COLUMN_MAP = {
+    "DGS10": "10 Yr",
+    "DGS3MO": "3 Mo",
+}
 
 MACRO_SERIES: dict[str, dict[str, str]] = {
     "DGS10": {
@@ -59,17 +67,83 @@ MACRO_SERIES: dict[str, dict[str, str]] = {
 }
 
 
-def _fetch_series_with_fredapi(series_id: str, api_key: str) -> pd.Series:
-    try:
-        from fredapi import Fred
-    except ImportError as exc:  # pragma: no cover - exercised via fallback path in test environments
-        raise RuntimeError("fredapi is not installed.") from exc
+def _fetch_series_with_fred_api(
+    series_id: str,
+    api_key: str,
+    session: requests.Session | None = None,
+    timeout_seconds: int = 10,
+) -> pd.Series:
+    http = session or requests.Session()
+    response = http.get(
+        FRED_API_OBSERVATIONS_URL,
+        params={
+            "series_id": series_id,
+            "api_key": api_key,
+            "file_type": "json",
+            "sort_order": "asc",
+        },
+        timeout=timeout_seconds,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    observations = payload.get("observations", [])
+    if not observations:
+        return pd.Series(dtype=float, name=series_id)
 
-    client = Fred(api_key=api_key)
-    series = client.get_series(series_id)
-    if series is None:
-        return pd.Series(dtype=float)
-    return pd.to_numeric(series, errors="coerce")
+    frame = pd.DataFrame(observations)
+    if "date" not in frame or "value" not in frame:
+        raise ValueError(f"Unexpected FRED API payload for {series_id}.")
+    return pd.Series(
+        pd.to_numeric(frame["value"], errors="coerce").to_numpy(),
+        index=pd.to_datetime(frame["date"]),
+        name=series_id,
+    )
+
+
+def _fetch_treasury_yield_series(
+    session: requests.Session | None = None,
+    years: tuple[int, ...] | None = None,
+    timeout_seconds: int = 10,
+) -> dict[str, pd.Series]:
+    http = session or requests.Session()
+    target_years = years or (pd.Timestamp.utcnow().year, pd.Timestamp.utcnow().year - 1)
+    frames: list[pd.DataFrame] = []
+
+    for year in dict.fromkeys(target_years):
+        response = http.get(
+            TREASURY_YIELD_CSV_URL_TEMPLATE.format(year=year),
+            params={
+                "type": "daily_treasury_yield_curve",
+                "_format": "csv",
+            },
+            timeout=timeout_seconds,
+        )
+        response.raise_for_status()
+        frame = pd.read_csv(StringIO(response.text))
+        if frame.empty:
+            continue
+        frames.append(frame)
+
+    if not frames:
+        return {}
+
+    combined = pd.concat(frames, ignore_index=True)
+    if "Date" not in combined:
+        raise ValueError("Unexpected Treasury yield CSV payload.")
+
+    combined["Date"] = pd.to_datetime(combined["Date"])
+    combined = combined.drop_duplicates(subset=["Date"], keep="last").sort_values("Date")
+
+    payload: dict[str, pd.Series] = {}
+    for series_id, column_name in TREASURY_YIELD_COLUMN_MAP.items():
+        if column_name not in combined:
+            raise ValueError(f"Missing Treasury yield column {column_name}.")
+        payload[series_id] = pd.Series(
+            pd.to_numeric(combined[column_name], errors="coerce").to_numpy(),
+            index=combined["Date"],
+            name=series_id,
+        )
+    return payload
 
 
 def _fetch_series_with_csv_fallback(
@@ -104,22 +178,54 @@ def fetch_macro_series(
     api_key: str | None = None,
     session: requests.Session | None = None,
     series_ids: list[str] | None = None,
+    timeout_seconds: int = 10,
 ) -> dict[str, pd.Series]:
     """Fetch the spec-defined macro series from FRED."""
     resolved_api_key = api_key or os.getenv("FRED_API_KEY")
     payload: dict[str, pd.Series] = {}
     target_series_ids = series_ids or list(MACRO_SERIES)
 
-    for series_id in target_series_ids:
+    treasury_series_ids = [series_id for series_id in target_series_ids if series_id in TREASURY_YIELD_COLUMN_MAP]
+    if treasury_series_ids and not resolved_api_key:
+        LOGGER.info("Calling treasury yield curve for %s", ", ".join(treasury_series_ids))
         try:
-            if resolved_api_key:
-                series = _fetch_series_with_fredapi(series_id, resolved_api_key)
-            else:
-                series = _fetch_series_with_csv_fallback(series_id, session=session)
+            treasury_payload = _fetch_treasury_yield_series(
+                session=session,
+                timeout_seconds=timeout_seconds,
+            )
+        except Exception as exc:  # pragma: no cover - network failures are logged and skipped
+            LOGGER.warning("Skipping Treasury yield fetch due to error: %s", exc)
+        else:
+            for series_id in treasury_series_ids:
+                series = treasury_payload.get(series_id)
+                if series is None:
+                    LOGGER.warning("Treasury payload did not include %s", series_id)
+                    continue
+                payload[series_id] = series
+
+    remaining_series_ids = [series_id for series_id in target_series_ids if series_id not in payload]
+    if not remaining_series_ids:
+        return payload
+
+    if not resolved_api_key:
+        LOGGER.warning(
+            "Skipping FRED-only series without FRED_API_KEY: %s",
+            ", ".join(remaining_series_ids),
+        )
+        return payload
+
+    for series_id in remaining_series_ids:
+        LOGGER.info("Calling fred api series %s", series_id)
+        try:
+            series = _fetch_series_with_fred_api(
+                series_id,
+                resolved_api_key,
+                session=session,
+                timeout_seconds=timeout_seconds,
+            )
         except Exception as exc:  # pragma: no cover - network failures are logged and skipped
             LOGGER.warning("Skipping FRED series %s due to fetch error: %s", series_id, exc)
             continue
-
         payload[series_id] = series
 
     return payload
@@ -183,6 +289,7 @@ def persist_macro_signals(signals: pd.DataFrame, db_path: Path | None = None) ->
 
 def run_macro_collector(db_path: Path | None = None) -> int:
     """Fetch and persist the spec-defined macro signals."""
-    series_payloads = fetch_macro_series()
+    with requests.Session() as session:
+        series_payloads = fetch_macro_series(session=session, timeout_seconds=10)
     signals = normalize_macro_signals(series_payloads)
     return persist_macro_signals(signals, db_path=db_path)

@@ -29,7 +29,7 @@ class QMISSchemaTests(unittest.TestCase):
             finally:
                 connection.close()
 
-        self.assertEqual(tables, {"alerts", "features", "regimes", "relationships", "signals"})
+        self.assertEqual(tables, {"alerts", "collector_runs", "features", "regimes", "relationships", "signals"})
 
     def test_bootstrap_database_applies_spec_columns(self) -> None:
         from qmis.schema import bootstrap_database
@@ -59,6 +59,10 @@ class QMISSchemaTests(unittest.TestCase):
                 alerts_columns = {
                     row[1]
                     for row in connection.execute("PRAGMA table_info('alerts')").fetchall()
+                }
+                collector_runs_columns = {
+                    row[1]
+                    for row in connection.execute("PRAGMA table_info('collector_runs')").fetchall()
                 }
             finally:
                 connection.close()
@@ -123,6 +127,17 @@ class QMISSchemaTests(unittest.TestCase):
                 "series_x",
                 "series_y",
                 "metadata",
+            },
+        )
+        self.assertEqual(
+            collector_runs_columns,
+            {
+                "collector_name",
+                "source",
+                "collected_at",
+                "status",
+                "row_count",
+                "message",
             },
         )
 

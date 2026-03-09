@@ -73,6 +73,16 @@ SCHEMA_STATEMENTS = (
         metadata JSON
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS collector_runs (
+        collector_name TEXT,
+        source TEXT,
+        collected_at TIMESTAMP,
+        status TEXT,
+        row_count INTEGER,
+        message TEXT
+    )
+    """,
 )
 
 SCHEMA_MIGRATIONS = (

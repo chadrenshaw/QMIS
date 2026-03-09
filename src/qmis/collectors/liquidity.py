@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import requests
 
 from qmis.collectors.macro import MACRO_SERIES, fetch_macro_series
 from qmis.collectors.market import MARKET_SERIES, _extract_close_frame, fetch_market_download
@@ -108,7 +109,12 @@ def persist_liquidity_signals(signals: pd.DataFrame, db_path: Path | None = None
 
 def run_liquidity_collector(db_path: Path | None = None) -> int:
     """Fetch and persist the spec-defined liquidity inputs."""
-    macro_series_payloads = fetch_macro_series(series_ids=list(LIQUIDITY_FRED_SERIES))
+    with requests.Session() as session:
+        macro_series_payloads = fetch_macro_series(
+            series_ids=list(LIQUIDITY_FRED_SERIES),
+            session=session,
+            timeout_seconds=10,
+        )
     market_download = fetch_market_download(tickers=list(LIQUIDITY_MARKET_SERIES))
     signals = normalize_liquidity_signals(
         macro_series_payloads=macro_series_payloads,

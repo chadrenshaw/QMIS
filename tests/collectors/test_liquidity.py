@@ -7,6 +7,7 @@ from unittest import mock
 
 import duckdb
 import pandas as pd
+import requests
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -109,6 +110,29 @@ class QMISLiquidityCollectorTests(unittest.TestCase):
                 "value": 103.2,
                 "unit": "index_points",
             },
+        )
+
+    def test_run_liquidity_collector_uses_shared_http_session_for_macro_fetches(self) -> None:
+        from qmis.collectors.liquidity import run_liquidity_collector
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "qmis.duckdb"
+            fake_session = mock.MagicMock(spec=requests.Session)
+            fake_session.__enter__.return_value = fake_session
+            fake_session.__exit__.return_value = None
+            with mock.patch("qmis.collectors.liquidity.requests.Session", return_value=fake_session), mock.patch(
+                "qmis.collectors.liquidity.fetch_macro_series",
+                return_value=self._build_macro_series(),
+            ) as fetch_macro_series, mock.patch(
+                "qmis.collectors.liquidity.fetch_market_download",
+                return_value=self._build_market_download(),
+            ):
+                run_liquidity_collector(db_path=db_path)
+
+        fetch_macro_series.assert_called_once_with(
+            series_ids=["M2SL", "WALCL", "RRPONTSYD"],
+            session=fake_session,
+            timeout_seconds=10,
         )
 
 

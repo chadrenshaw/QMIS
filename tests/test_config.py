@@ -38,6 +38,25 @@ class QMISConfigTests(unittest.TestCase):
         self.assertEqual(config.data_dir, data_root / "data")
         self.assertEqual(config.web_dist_dir, web_dist_dir)
 
+    def test_load_config_reads_repo_local_env_file(self) -> None:
+        from qmis import config as config_module
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            env_path = repo_root / ".env.local"
+            env_path.write_text("FRED_API_KEY=test-key\nQMIS_DATA_ROOT=./runtime\n", encoding="utf-8")
+
+            with patch.object(config_module, "resolve_repo_root", return_value=repo_root), patch.dict(
+                os.environ,
+                {},
+                clear=True,
+            ):
+                config = config_module.load_config()
+                self.assertEqual(os.environ["FRED_API_KEY"], "test-key")
+
+        self.assertEqual(config.repo_root, repo_root)
+        self.assertEqual(config.data_root, Path("runtime"))
+
 
 if __name__ == "__main__":
     unittest.main()

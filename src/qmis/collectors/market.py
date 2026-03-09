@@ -27,6 +27,7 @@ def fetch_market_download(
     period: str = "400d",
     interval: str = "1d",
     tickers: list[str] | None = None,
+    threads: bool = False,
 ) -> pd.DataFrame:
     """Fetch market history for the spec-defined market assets."""
     return yf.download(
@@ -36,7 +37,7 @@ def fetch_market_download(
         group_by="ticker",
         auto_adjust=False,
         progress=False,
-        threads=True,
+        threads=threads,
         multi_level_index=True,
     )
 

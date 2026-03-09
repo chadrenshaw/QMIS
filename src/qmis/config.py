@@ -24,9 +24,28 @@ def resolve_repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _load_local_env_file(repo_root: Path) -> None:
+    """Load simple KEY=value overrides from a repo-local .env.local file."""
+    env_path = repo_root / ".env.local"
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        normalized_key = key.strip()
+        normalized_value = value.strip().strip('"').strip("'")
+        if normalized_key and normalized_key not in os.environ:
+            os.environ[normalized_key] = normalized_value
+
+
 def load_config() -> QMISConfig:
     """Load the default QMIS configuration rooted in the current repository."""
     repo_root = resolve_repo_root()
+    _load_local_env_file(repo_root)
     data_root = Path(os.environ.get("QMIS_DATA_ROOT", repo_root))
     db_path = Path(os.environ.get("QMIS_DB_PATH", data_root / "db" / "qmis.duckdb"))
     log_dir = Path(os.environ.get("QMIS_LOG_DIR", data_root / "logs"))

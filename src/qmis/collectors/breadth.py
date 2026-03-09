@@ -45,9 +45,28 @@ def fetch_breadth_market_download(
     symbols: list[str],
     period: str = "450d",
     interval: str = "1d",
+    chunk_size: int = 100,
 ) -> pd.DataFrame:
     """Fetch constituent price history for breadth calculations."""
-    return fetch_market_download(period=period, interval=interval, tickers=symbols)
+    if not symbols:
+        return pd.DataFrame()
+
+    batches: list[pd.DataFrame] = []
+    for start_index in range(0, len(symbols), chunk_size):
+        batch_symbols = symbols[start_index : start_index + chunk_size]
+        batch_download = fetch_market_download(
+            period=period,
+            interval=interval,
+            tickers=batch_symbols,
+            threads=False,
+        )
+        if not batch_download.empty:
+            batches.append(batch_download)
+
+    if not batches:
+        return pd.DataFrame()
+
+    return pd.concat(batches, axis=1).sort_index(axis=1)
 
 
 def _build_close_frame(raw_download: pd.DataFrame, symbols: list[str]) -> pd.DataFrame:
