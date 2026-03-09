@@ -6,8 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from qmis.alerts.engine import load_alert_snapshot
+from qmis.config import load_config
 from qmis.dashboard.cli import load_dashboard_snapshot
 from qmis.schema import bootstrap_database
 from qmis.signals.anomalies import detect_relationship_anomalies
@@ -120,9 +123,11 @@ def _fetch_anomalies(db_path: Path) -> list[dict[str, Any]]:
     return [_serialize_record(row) for row in anomalies.to_dict("records")]
 
 
-def create_app(db_path: Path | None = None) -> FastAPI:
+def create_app(db_path: Path | None = None, web_dist_dir: Path | None = None) -> FastAPI:
     """Create the optional read-only FastAPI application."""
+    config = load_config()
     resolved_db_path = bootstrap_database(db_path or get_default_db_path())
+    resolved_web_dist_dir = web_dist_dir or config.web_dist_dir
     app = FastAPI(title="QMIS Read API", version="0.1.0")
 
     @app.get("/health")
@@ -178,6 +183,20 @@ def create_app(db_path: Path | None = None) -> FastAPI:
             "alert_summary": _serialize_record(snapshot["alert_summary"]),
             "alerts": [_serialize_record(row) for row in snapshot["alerts"]],
         }
+
+    index_file = resolved_web_dist_dir / "index.html"
+    assets_dir = resolved_web_dist_dir / "assets"
+    if index_file.exists():
+        if assets_dir.exists():
+            app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+        @app.get("/", include_in_schema=False)
+        def frontend_index() -> FileResponse:
+            return FileResponse(index_file)
+
+        @app.get("/{frontend_path:path}", include_in_schema=False)
+        def frontend_fallback(frontend_path: str) -> FileResponse:
+            return FileResponse(index_file)
 
     return app
 

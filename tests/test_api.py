@@ -167,6 +167,30 @@ class QMISAPITests(unittest.TestCase):
         self.assertIn("market", dashboard.json()["signal_groups"])
         self.assertIn("gold", dashboard.json()["signal_groups"]["market"])
 
+    def test_create_app_serves_built_frontend_assets_from_same_process(self) -> None:
+        from qmis.api import create_app
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            db_path = temp_root / "qmis.duckdb"
+            dist_dir = temp_root / "dist"
+            assets_dir = dist_dir / "assets"
+            assets_dir.mkdir(parents=True)
+            (dist_dir / "index.html").write_text("<!doctype html><html><body>QMIS Dashboard</body></html>", encoding="utf-8")
+            (assets_dir / "app.js").write_text("console.log('qmis');", encoding="utf-8")
+
+            client = TestClient(create_app(db_path=db_path, web_dist_dir=dist_dir))
+            root = client.get("/")
+            asset = client.get("/assets/app.js")
+            health = client.get("/health")
+
+        self.assertEqual(root.status_code, 200)
+        self.assertIn("QMIS Dashboard", root.text)
+        self.assertEqual(asset.status_code, 200)
+        self.assertIn("console.log('qmis');", asset.text)
+        self.assertEqual(health.status_code, 200)
+        self.assertEqual(health.json()["status"], "ok")
+
 
 if __name__ == "__main__":
     unittest.main()

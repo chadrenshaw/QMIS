@@ -1,0 +1,16 @@
+services:
+  qmis:
+    build:
+      context: .
+    image: qmis:local
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: "8000"
+      QMIS_DATA_ROOT: /var/lib/qmis
+      QMIS_ENABLE_SCHEDULER: "1"
+      QMIS_BOOTSTRAP_ON_START: "1"
+      FRED_API_KEY: ${FRED_API_KEY:-}
+    volumes:
+      - ./runtime:/var/lib/qmis
+    restart: unless-stopped
