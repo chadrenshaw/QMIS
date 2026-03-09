@@ -59,6 +59,12 @@ MACRO_SERIES: dict[str, dict[str, str]] = {
         "unit": "billions_usd",
         "frequency": "daily",
     },
+    "DFII10": {
+        "series_name": "real_yields",
+        "indicator_name": "10Y Real Yield",
+        "unit": "percent",
+        "frequency": "daily",
+    },
     "BSCICP02USM460S": {
         "series_name": "pmi",
         "indicator_name": "PMI",

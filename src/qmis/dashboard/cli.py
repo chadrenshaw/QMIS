@@ -103,6 +103,7 @@ def _coerce_timestamp(value: Any) -> datetime | None:
 def _build_freshness(
     latest_signal_ts: Any,
     latest_regime_ts: Any,
+    latest_liquidity_ts: Any,
     latest_relationship_ts: Any,
     latest_stress_ts: Any,
 ) -> dict[str, Any]:
@@ -110,6 +111,7 @@ def _build_freshness(
         ts for ts in (
             _coerce_timestamp(latest_signal_ts),
             _coerce_timestamp(latest_regime_ts),
+            _coerce_timestamp(latest_liquidity_ts),
             _coerce_timestamp(latest_relationship_ts),
             _coerce_timestamp(latest_stress_ts),
         )
@@ -120,6 +122,7 @@ def _build_freshness(
             "status": "empty",
             "latest_signal_ts": latest_signal_ts,
             "latest_regime_ts": latest_regime_ts,
+            "latest_liquidity_ts": latest_liquidity_ts,
             "latest_relationship_ts": latest_relationship_ts,
             "latest_stress_ts": latest_stress_ts,
         }
@@ -131,6 +134,7 @@ def _build_freshness(
         "status": status,
         "latest_signal_ts": latest_signal_ts,
         "latest_regime_ts": latest_regime_ts,
+        "latest_liquidity_ts": latest_liquidity_ts,
         "latest_relationship_ts": latest_relationship_ts,
         "latest_stress_ts": latest_stress_ts,
         "age_days": age_days,
@@ -192,6 +196,14 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
             """
             SELECT ts, stress_score, stress_level, summary, components, missing_inputs
             FROM stress_snapshots
+            ORDER BY ts DESC
+            LIMIT 1
+            """
+        ).fetchdf()
+        liquidity_rows = connection.execute(
+            """
+            SELECT ts, liquidity_score, liquidity_state, summary, components, missing_inputs
+            FROM liquidity_snapshots
             ORDER BY ts DESC
             LIMIT 1
             """
@@ -272,6 +284,18 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         if not stress_rows.empty
         else None
     )
+    liquidity_environment = (
+        {
+            "ts": liquidity_rows.iloc[0]["ts"],
+            "liquidity_score": float(liquidity_rows.iloc[0]["liquidity_score"]),
+            "liquidity_state": str(liquidity_rows.iloc[0]["liquidity_state"]),
+            "summary": str(liquidity_rows.iloc[0]["summary"]),
+            "components": _parse_metadata(liquidity_rows.iloc[0]["components"]),
+            "missing_inputs": _parse_json_list(liquidity_rows.iloc[0]["missing_inputs"]),
+        }
+        if not liquidity_rows.empty
+        else None
+    )
 
     latest_regime = regime_rows.iloc[0].to_dict() if not regime_rows.empty else None
     scores = (
@@ -348,6 +372,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
     freshness = _build_freshness(
         latest_signal_ts=signal_rows["ts"].max() if not signal_rows.empty else None,
         latest_regime_ts=regime_rows["ts"].max() if not regime_rows.empty else None,
+        latest_liquidity_ts=liquidity_rows["ts"].max() if not liquidity_rows.empty else None,
         latest_relationship_ts=relationship_rows["ts"].max() if not relationship_rows.empty else None,
         latest_stress_ts=stress_rows["ts"].max() if not stress_rows.empty else None,
     )
@@ -357,6 +382,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
             for ts in (
                 signal_rows["ts"].max() if not signal_rows.empty else None,
                 regime_rows["ts"].max() if not regime_rows.empty else None,
+                liquidity_rows["ts"].max() if not liquidity_rows.empty else None,
                 relationship_rows["ts"].max() if not relationship_rows.empty else None,
                 stress_rows["ts"].max() if not stress_rows.empty else None,
             )
@@ -377,6 +403,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         "regime": latest_regime,
         "factors": factors,
         "market_stress": market_stress,
+        "liquidity_environment": liquidity_environment,
         "yield_curve": yield_curve,
         "yield_curve_state": yield_curve_state,
         "freshness": freshness,
@@ -548,6 +575,17 @@ def render_market_stress(snapshot: dict[str, Any], console: Console) -> None:
     console.print(Panel(body, title="MARKET STRESS", expand=False))
 
 
+def render_liquidity_environment(snapshot: dict[str, Any], console: Console) -> None:
+    liquidity = snapshot["intelligence"].get("liquidity_environment")
+    if not liquidity:
+        console.print(Panel("No liquidity environment snapshot available.", title="LIQUIDITY ENVIRONMENT", expand=False))
+        return
+    missing_inputs = liquidity.get("missing_inputs", [])
+    missing_text = f"\nMissing inputs: {', '.join(missing_inputs)}" if missing_inputs else ""
+    body = f"{liquidity['liquidity_state']} ({float(liquidity['liquidity_score']):.1f})\n{liquidity['summary']}{missing_text}"
+    console.print(Panel(body, title="LIQUIDITY ENVIRONMENT", expand=False))
+
+
 def render_market_forces(snapshot: dict[str, Any], console: Console) -> None:
     drivers = snapshot["intelligence"]["market_drivers"]
     body = "\n".join(f"- {driver['title']}: {driver['summary']}" for driver in drivers) if drivers else "- No dominant drivers detected."
@@ -601,6 +639,7 @@ def render_dashboard(snapshot: dict[str, Any], console: Console | None = None) -
     _render_market_pulse(snapshot, console)
     _render_cosmic_state(snapshot, console)
     render_market_stress(snapshot, console)
+    render_liquidity_environment(snapshot, console)
     render_market_forces(snapshot, console)
     render_relationship_changes(snapshot, console)
     render_risk_indicators(snapshot, console)

@@ -178,6 +178,55 @@ class QMISFactorTests(unittest.TestCase):
         self.assertEqual(list(persisted["component_rank"]), [1, 2, 3])
         self.assertEqual(str(persisted.iloc[0]["direction"]), "tightening")
 
+    def test_materialize_factors_uses_persisted_liquidity_state_for_direction(self) -> None:
+        from qmis.schema import bootstrap_database
+        from qmis.signals.factors import materialize_factors
+        from qmis.storage import connect_db
+
+        signals = self._build_signal_frame()
+        features = self._build_feature_frame(pd.Timestamp("2025-06-29"))
+        liquidity_snapshot = pd.DataFrame(
+            [
+                {
+                    "ts": pd.Timestamp("2025-06-29"),
+                    "liquidity_score": 72.5,
+                    "liquidity_state": "EXPANDING",
+                    "summary": "Liquidity is expanding.",
+                    "components": json.dumps({"fed_balance_sheet": {"score": 0.7}}),
+                    "missing_inputs": json.dumps([]),
+                }
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "qmis.duckdb"
+            bootstrap_database(db_path)
+            with connect_db(db_path) as connection:
+                for table_name, payload in (
+                    ("signals", signals),
+                    ("features", features),
+                    ("liquidity_snapshots", liquidity_snapshot),
+                ):
+                    connection.register(f"{table_name}_df", payload)
+                    connection.execute(f"INSERT INTO {table_name} SELECT * FROM {table_name}_df")
+                    connection.unregister(f"{table_name}_df")
+
+            materialize_factors(db_path=db_path)
+
+            connection = duckdb.connect(str(db_path), read_only=True)
+            try:
+                direction = connection.execute(
+                    """
+                    SELECT direction
+                    FROM factors
+                    WHERE factor_name = 'liquidity'
+                    """
+                ).fetchone()[0]
+            finally:
+                connection.close()
+
+        self.assertEqual(direction, "expanding")
+
 
 if __name__ == "__main__":
     unittest.main()

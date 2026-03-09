@@ -118,12 +118,25 @@ class QMISAPITests(unittest.TestCase):
                 }
             ]
         )
+        liquidity_environment = pd.DataFrame(
+            [
+                {
+                    "ts": ts,
+                    "liquidity_score": 58.4,
+                    "liquidity_state": "NEUTRAL",
+                    "summary": "Liquidity is neutral as balance-sheet expansion is offset by firm real yields.",
+                    "components": '{"fed_balance_sheet": {"score": 0.18}, "m2_money_supply": {"score": 0.11}, "reverse_repo_usage": {"score": 0.42}, "dollar_index": {"score": -0.10}, "real_yields": {"score": -0.22}}',
+                    "missing_inputs": '[]',
+                }
+            ]
+        )
 
         with connect_db(db_path) as connection:
             for table_name, payload in (
                 ("signals", signals),
                 ("features", features),
                 ("stress_snapshots", stress),
+                ("liquidity_snapshots", liquidity_environment),
                 ("regimes", regimes),
                 ("relationships", relationships),
             ):
@@ -179,6 +192,7 @@ class QMISAPITests(unittest.TestCase):
         self.assertGreaterEqual(len(dashboard.json()["alerts"]), 3)
         self.assertEqual(dashboard.json()["market_stress"]["stress_level"], "HIGH")
         self.assertEqual(dashboard.json()["market_stress"]["missing_inputs"], ["credit"])
+        self.assertEqual(dashboard.json()["liquidity_environment"]["liquidity_state"], "NEUTRAL")
         self.assertIn("market", dashboard.json()["signal_groups"])
         self.assertIn("gold", dashboard.json()["signal_groups"]["market"])
 

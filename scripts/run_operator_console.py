@@ -36,6 +36,7 @@ from qmis.logger import get_logger
 from qmis.signals.correlations import materialize_relationships
 from qmis.signals.factors import materialize_factors
 from qmis.signals.leadlag import materialize_lead_lag_relationships
+from qmis.signals.liquidity import materialize_liquidity_state
 from qmis.signals.regime import materialize_regime
 from qmis.signals.stress import materialize_market_stress
 from qmis.storage import connect_db
@@ -71,7 +72,7 @@ def _collector_specs() -> tuple[dict[str, Any], ...]:
             "name": "macro",
             "source": "fred",
             "runner": run_macro_collector,
-            "series_names": ("yield_10y", "yield_3m", "m2_money_supply", "fed_balance_sheet", "reverse_repo_usage", "pmi"),
+            "series_names": ("yield_10y", "yield_3m", "m2_money_supply", "fed_balance_sheet", "reverse_repo_usage", "real_yields", "pmi"),
             "max_age": timedelta(hours=12),
             "timeout_seconds": 75,
         },
@@ -79,7 +80,7 @@ def _collector_specs() -> tuple[dict[str, Any], ...]:
             "name": "liquidity",
             "source": "fred,yfinance",
             "runner": run_liquidity_collector,
-            "series_names": ("fed_balance_sheet", "reverse_repo_usage", "m2_money_supply", "dollar_index"),
+            "series_names": ("fed_balance_sheet", "reverse_repo_usage", "m2_money_supply", "dollar_index", "real_yields"),
             "max_age": timedelta(hours=12),
             "timeout_seconds": 75,
         },
@@ -333,6 +334,7 @@ def _refresh_pipeline(
         "collector_failures": collector_summary["failures"],
         "features": int(materialize_features(db_path=db_path)),
         "regime": int(materialize_regime(db_path=db_path)),
+        "liquidity": int(materialize_liquidity_state(db_path=db_path)),
         "factors": int(materialize_factors(db_path=db_path)),
         "relationships": int(materialize_relationships(db_path=db_path)),
         "stress": int(materialize_market_stress(db_path=db_path)),
@@ -348,7 +350,7 @@ def _render_refresh_summary(summary: dict[str, int | dict[str, int]], console: C
     message = (
         "Refresh complete\n"
         f"Collectors: {collector_text}\n"
-        f"Features: {summary['features']}  Regime: {summary['regime']}  Factors: {summary['factors']}  Stress: {summary['stress']}  "
+        f"Features: {summary['features']}  Regime: {summary['regime']}  Liquidity: {summary['liquidity']}  Factors: {summary['factors']}  Stress: {summary['stress']}  "
         f"Relationships: {summary['relationships']}  Lead-lag: {summary['lead_lag']}  Alerts: {summary['alerts']}"
     )
     failures = summary.get("collector_failures", [])
@@ -366,7 +368,7 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
     if args.dry_run:
         message = (
             f"QMIS operator console dry-run: repo={config.repo_root} db={config.db_path} "
-            "collectors=all analysis=features,regime,factors,relationships,stress,lead-lag alerts=materialize dashboard=render"
+            "collectors=all analysis=features,regime,liquidity,factors,relationships,stress,lead-lag alerts=materialize dashboard=render"
         )
         logger.info(message)
         print(message)

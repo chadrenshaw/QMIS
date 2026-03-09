@@ -275,6 +275,19 @@ class OperatorInterpreterTests(unittest.TestCase):
                 },
                 "missing_inputs": ["credit"],
             },
+            "liquidity_environment": {
+                "liquidity_score": 31.5,
+                "liquidity_state": "TIGHTENING",
+                "summary": "Liquidity is tightening as real yields and the dollar firm while balance-sheet support fades.",
+                "components": {
+                    "fed_balance_sheet": {"score": -0.42, "weight": 0.3},
+                    "m2_money_supply": {"score": 0.15, "weight": 0.2},
+                    "reverse_repo_usage": {"score": 0.48, "weight": 0.2},
+                    "dollar_index": {"score": -0.32, "weight": 0.15},
+                    "real_yields": {"score": -0.36, "weight": 0.15},
+                },
+                "missing_inputs": [],
+            },
             "anomalies": [
                 {
                     "series_x": "BTCUSD",
@@ -322,7 +335,7 @@ class OperatorInterpreterTests(unittest.TestCase):
 
         self.assertEqual(
             intelligence["global_state_line"],
-            "Regime: LIQUIDITY WITHDRAWAL | Volatility: HIGH | Liquidity: TIGHT | Growth: WEAK | Inflation: ELEVATED",
+            "Regime: LIQUIDITY WITHDRAWAL | Volatility: HIGH | Liquidity: TIGHTENING | Growth: WEAK | Inflation: ELEVATED",
         )
         self.assertIn("Sun: Pisces", intelligence["cosmic_state_line"])
         self.assertIn("Moon: Waning Gibbous", intelligence["cosmic_state_line"])
@@ -334,6 +347,7 @@ class OperatorInterpreterTests(unittest.TestCase):
         self.assertEqual(intelligence["risk_monitor"]["growth_risk"]["level"], "HIGH")
         self.assertEqual(intelligence["risk_monitor"]["systemic_risk"]["level"], "CRITICAL")
         self.assertEqual(intelligence["market_stress"]["stress_level"], "HIGH")
+        self.assertEqual(intelligence["liquidity_environment"]["liquidity_state"], "TIGHTENING")
         self.assertIn("breadth", intelligence["market_stress"]["summary"].lower())
         self.assertTrue(intelligence["experimental_signals"]["visible"])
 

@@ -17,7 +17,7 @@ NATURAL_SIGNAL_SERIES = (
     "global_temperature_anomaly",
     "solar_wind_speed",
 )
-LIQUIDITY_SERIES = {"fed_balance_sheet", "m2_money_supply", "reverse_repo_usage"}
+LIQUIDITY_SERIES = {"fed_balance_sheet", "m2_money_supply", "reverse_repo_usage", "real_yields", "dollar_index"}
 CRYPTO_SERIES = {"BTCUSD", "ETHUSD", "BTC_dominance", "crypto_market_cap"}
 VOLATILITY_SERIES = {"vix", "sp500_above_200dma", "new_highs", "new_lows"}
 
@@ -29,6 +29,11 @@ def _signal(snapshot: dict[str, Any], series_name: str) -> dict[str, Any]:
 def _signal_value(snapshot: dict[str, Any], series_name: str) -> float | None:
     value = snapshot.get("signal_summary", {}).get(series_name, {}).get("value")
     return float(value) if value is not None else None
+
+
+def _liquidity_environment(snapshot: dict[str, Any]) -> dict[str, Any]:
+    liquidity = snapshot.get("liquidity_environment")
+    return dict(liquidity) if isinstance(liquidity, dict) else {}
 
 
 def _trend(snapshot: dict[str, Any], series_name: str) -> str:
@@ -257,7 +262,8 @@ def generate_risk_indicators(snapshot: dict[str, Any]) -> dict[str, dict[str, An
     vix = _signal_value(snapshot, "vix")
     inflation_score = int(snapshot.get("scores", {}).get("inflation_score", 0))
     growth_score = int(snapshot.get("scores", {}).get("growth_score", 0))
-    liquidity_score = int(snapshot.get("scores", {}).get("liquidity_score", 0))
+    liquidity_snapshot = _liquidity_environment(snapshot)
+    liquidity_score = liquidity_snapshot.get("liquidity_score")
     pmi = _signal_value(snapshot, "pmi")
     breadth = _signal_value(snapshot, "sp500_above_200dma")
     regime_label = str(snapshot.get("regime", {}).get("regime_label", ""))
@@ -271,12 +277,15 @@ def generate_risk_indicators(snapshot: dict[str, Any]) -> dict[str, dict[str, An
     else:
         volatility_state = "contained"
 
-    if regime_label == "LIQUIDITY WITHDRAWAL" or liquidity_score <= 0:
-        liquidity_state = "tightening"
-    elif liquidity_score >= 3:
-        liquidity_state = "expanding"
-    else:
-        liquidity_state = "neutral"
+    liquidity_state = str(liquidity_snapshot.get("liquidity_state", "")).lower()
+    if liquidity_state not in {"tightening", "neutral", "expanding"}:
+        fallback_score = int(snapshot.get("scores", {}).get("liquidity_score", 0))
+        if regime_label == "LIQUIDITY WITHDRAWAL" or fallback_score <= 0:
+            liquidity_state = "tightening"
+        elif fallback_score >= 3:
+            liquidity_state = "expanding"
+        else:
+            liquidity_state = "neutral"
 
     if inflation_score >= 3:
         inflation_state = "hot"
@@ -301,7 +310,7 @@ def generate_risk_indicators(snapshot: dict[str, Any]) -> dict[str, dict[str, An
         "liquidity": {
             "state": liquidity_state,
             "value": liquidity_score,
-            "summary": f"Regime bias is {regime_label or 'unknown'}.",
+            "summary": str(liquidity_snapshot.get("summary") or f"Regime bias is {regime_label or 'unknown'}."),
         },
         "inflation_pressure": {
             "state": inflation_state,
@@ -333,7 +342,7 @@ def _risk_level_from_vix(vix: float | None) -> str:
 def _liquidity_descriptor(snapshot: dict[str, Any]) -> str:
     risk = generate_risk_indicators(snapshot)
     state = str(risk["liquidity"]["state"])
-    return {"tightening": "TIGHT", "neutral": "NEUTRAL", "expanding": "EASY"}.get(state, "NEUTRAL")
+    return {"tightening": "TIGHTENING", "neutral": "NEUTRAL", "expanding": "EXPANDING"}.get(state, "NEUTRAL")
 
 
 def _growth_descriptor(snapshot: dict[str, Any]) -> str:
@@ -468,9 +477,12 @@ def build_risk_monitor(snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
     anomaly_count = len(snapshot.get("anomalies", []))
     base_risk = int(snapshot.get("scores", {}).get("risk_score", 0))
 
-    if _liquidity_descriptor(snapshot) == "TIGHT":
+    liquidity_snapshot = _liquidity_environment(snapshot)
+    liquidity_state = str(liquidity_snapshot.get("liquidity_state") or _liquidity_descriptor(snapshot)).upper()
+
+    if liquidity_state == "TIGHTENING":
         liquidity_level = "HIGH"
-    elif int(snapshot.get("scores", {}).get("liquidity_score", 0)) >= 3:
+    elif liquidity_state == "EXPANDING":
         liquidity_level = "LOW"
     else:
         liquidity_level = "MODERATE"
@@ -505,7 +517,10 @@ def build_risk_monitor(snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
 
     return {
         "volatility_risk": {"level": _risk_level_from_vix(vix), "summary": "Derived from the current VIX regime."},
-        "liquidity_risk": {"level": liquidity_level, "summary": "Tracks tightening or easing liquidity conditions."},
+        "liquidity_risk": {
+            "level": liquidity_level,
+            "summary": str(liquidity_snapshot.get("summary") or "Tracks tightening or easing liquidity conditions."),
+        },
         "growth_risk": {"level": growth_level, "summary": "Blends PMI and breadth participation."},
         "systemic_risk": {"level": systemic_level, "summary": "Combines base risk score, anomalies, and critical alerts."},
     }
@@ -629,7 +644,7 @@ def build_warning_signals(snapshot: dict[str, Any]) -> list[dict[str, str]]:
     if vix is not None and vix >= 18.0:
         warnings.append({"title": "Rising volatility", "detail": f"VIX is elevated at {vix:.2f}."})
 
-    if _liquidity_descriptor(snapshot) == "TIGHT":
+    if _liquidity_descriptor(snapshot) == "TIGHTENING":
         warnings.append({"title": "Tight liquidity", "detail": "Liquidity conditions remain restrictive."})
 
     deduped: list[dict[str, str]] = []
@@ -658,6 +673,7 @@ def build_operator_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "market_pulse": build_market_pulse(snapshot),
         "cosmic_state_line": build_cosmic_state_line(snapshot, world_state),
         "market_stress": snapshot.get("market_stress"),
+        "liquidity_environment": snapshot.get("liquidity_environment"),
         "market_drivers": build_market_drivers(snapshot),
         "relationship_shifts": relationship_changes,
         "risk_monitor": risk_monitor,

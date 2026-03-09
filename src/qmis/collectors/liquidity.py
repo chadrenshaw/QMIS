@@ -18,7 +18,7 @@ from qmis.storage import connect_db, get_default_db_path
 
 LIQUIDITY_FRED_SERIES = {
     series_id: MACRO_SERIES[series_id]
-    for series_id in ("M2SL", "WALCL", "RRPONTSYD")
+    for series_id in ("M2SL", "WALCL", "RRPONTSYD", "DFII10")
 }
 
 LIQUIDITY_MARKET_SERIES = {

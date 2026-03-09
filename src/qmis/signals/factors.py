@@ -155,6 +155,17 @@ def _determine_direction(theme: str, trends: dict[str, str]) -> str:
     return "mixed"
 
 
+def _liquidity_direction_from_snapshot(liquidity_snapshot: dict[str, Any] | None) -> str | None:
+    if not liquidity_snapshot:
+        return None
+    state = str(liquidity_snapshot.get("liquidity_state", "")).upper()
+    return {
+        "TIGHTENING": "tightening",
+        "NEUTRAL": "neutral",
+        "EXPANDING": "expanding",
+    }.get(state)
+
+
 def _driver_title(theme: str, direction: str) -> str:
     if theme == "liquidity":
         return f"Liquidity {direction.title()}"
@@ -171,7 +182,11 @@ def _factor_summary(theme: str, direction: str, strength: float, supporting_asse
     return f"{strength_label} {theme} driver ({direction}) led by {assets}."
 
 
-def build_factor_frame(signals: pd.DataFrame, feature_frame: pd.DataFrame | None = None) -> pd.DataFrame:
+def build_factor_frame(
+    signals: pd.DataFrame,
+    feature_frame: pd.DataFrame | None = None,
+    liquidity_snapshot: dict[str, Any] | None = None,
+) -> pd.DataFrame:
     """Compute the dominant factor snapshot from raw signal history."""
     matrix = _prepare_return_matrix(signals)
     columns = [
@@ -214,7 +229,11 @@ def build_factor_frame(signals: pd.DataFrame, feature_frame: pd.DataFrame | None
         assigned_themes.add(factor_name)
         supporting_assets = _supporting_assets(loadings)
         strength = float(eigenvalue) / total_variance
-        direction = _determine_direction(factor_name, trends)
+        direction = (
+            _liquidity_direction_from_snapshot(liquidity_snapshot)
+            if factor_name == "liquidity"
+            else None
+        ) or _determine_direction(factor_name, trends)
 
         factor_rows.append(
             {
@@ -254,8 +273,17 @@ def materialize_factors(db_path: Path | None = None) -> int:
             ORDER BY ts, series_name
             """
         ).fetchdf()
+        liquidity_rows = connection.execute(
+            """
+            SELECT ts, liquidity_score, liquidity_state, summary, components, missing_inputs
+            FROM liquidity_snapshots
+            ORDER BY ts DESC
+            LIMIT 1
+            """
+        ).fetchdf()
 
-        factor_frame = build_factor_frame(signals, features)
+        liquidity_snapshot = liquidity_rows.iloc[0].to_dict() if not liquidity_rows.empty else None
+        factor_frame = build_factor_frame(signals, features, liquidity_snapshot=liquidity_snapshot)
         connection.execute("DELETE FROM factors")
         if factor_frame.empty:
             return 0

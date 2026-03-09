@@ -24,6 +24,7 @@ class QMISLiquidityCollectorTests(unittest.TestCase):
             "M2SL": pd.Series([21800.0, 21820.0], index=index),
             "WALCL": pd.Series([6765000.0, 6768000.0], index=index),
             "RRPONTSYD": pd.Series([180.0, None], index=index),
+            "DFII10": pd.Series([1.81, 1.88], index=index),
         }
 
     def _build_market_download(self) -> pd.DataFrame:
@@ -45,7 +46,7 @@ class QMISLiquidityCollectorTests(unittest.TestCase):
             market_download=self._build_market_download(),
         )
 
-        self.assertEqual(len(signals), 7)
+        self.assertEqual(len(signals), 9)
         self.assertEqual(
             set(signals["series_name"]),
             {
@@ -53,6 +54,7 @@ class QMISLiquidityCollectorTests(unittest.TestCase):
                 "fed_balance_sheet",
                 "reverse_repo_usage",
                 "dollar_index",
+                "real_yields",
             },
         )
         self.assertTrue((signals["category"] == "liquidity").all())
@@ -62,7 +64,7 @@ class QMISLiquidityCollectorTests(unittest.TestCase):
         )
         self.assertEqual(
             set(signals["unit"]),
-            {"billions_usd", "millions_usd", "index_points"},
+            {"billions_usd", "millions_usd", "index_points", "percent"},
         )
 
         dollar_index_rows = signals.loc[signals["series_name"] == "dollar_index"].sort_values("ts")
@@ -72,6 +74,10 @@ class QMISLiquidityCollectorTests(unittest.TestCase):
         reverse_repo_rows = signals.loc[signals["series_name"] == "reverse_repo_usage"]
         self.assertEqual(len(reverse_repo_rows), 1)
         self.assertEqual(reverse_repo_rows.iloc[0]["value"], 180.0)
+
+        real_yield_rows = signals.loc[signals["series_name"] == "real_yields"].sort_values("ts")
+        self.assertEqual(list(real_yield_rows["value"]), [1.81, 1.88])
+        self.assertEqual(json.loads(real_yield_rows.iloc[0]["metadata"])["series_id"], "DFII10")
 
     def test_run_liquidity_collector_persists_rows_into_signals_table(self) -> None:
         from qmis.collectors.liquidity import run_liquidity_collector
@@ -99,8 +105,8 @@ class QMISLiquidityCollectorTests(unittest.TestCase):
             finally:
                 connection.close()
 
-        self.assertEqual(inserted_rows, 7)
-        self.assertEqual(len(persisted), 7)
+        self.assertEqual(inserted_rows, 9)
+        self.assertEqual(len(persisted), 9)
         self.assertEqual(
             persisted.iloc[0].to_dict(),
             {
@@ -130,7 +136,7 @@ class QMISLiquidityCollectorTests(unittest.TestCase):
                 run_liquidity_collector(db_path=db_path)
 
         fetch_macro_series.assert_called_once_with(
-            series_ids=["M2SL", "WALCL", "RRPONTSYD"],
+            series_ids=["M2SL", "WALCL", "RRPONTSYD", "DFII10"],
             session=fake_session,
             timeout_seconds=10,
         )
