@@ -1,4 +1,5 @@
 import json
+import logging
 import sys
 import tempfile
 import unittest
@@ -164,6 +165,25 @@ class QMISBreadthCollectorTests(unittest.TestCase):
         self.assertTrue(all(call.kwargs["threads"] is False for call in fetch_download.call_args_list[1:]))
         self.assertTrue(all(call.kwargs["timeout_seconds"] == 10 for call in fetch_download.call_args_list))
         self.assertEqual(set(combined.columns.get_level_values(0)), set(symbols))
+
+    def test_fetch_breadth_market_download_refills_missing_symbols_after_partial_primary_result(self) -> None:
+        from qmis.collectors.breadth import fetch_breadth_market_download
+
+        primary_download = self._build_batch_download(["AAA", "BBB", "CCC"])
+        with mock.patch(
+            "qmis.collectors.breadth.fetch_market_download",
+            side_effect=[
+                primary_download,
+                self._build_batch_download(["DDD", "EEE"]),
+            ],
+        ) as fetch_download:
+            combined = fetch_breadth_market_download(symbols=["AAA", "BBB", "CCC", "DDD", "EEE"], chunk_size=2)
+
+        self.assertEqual(fetch_download.call_count, 2)
+        self.assertEqual(fetch_download.call_args_list[0].kwargs["threads"], True)
+        self.assertEqual(fetch_download.call_args_list[1].kwargs["tickers"], ["DDD", "EEE"])
+        self.assertEqual(fetch_download.call_args_list[1].kwargs["threads"], False)
+        self.assertEqual(set(combined.columns.get_level_values(0)), {"AAA", "BBB", "CCC", "DDD", "EEE"})
 
 
 if __name__ == "__main__":

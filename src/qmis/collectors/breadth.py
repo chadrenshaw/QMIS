@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from io import StringIO
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,14 @@ SP500_CONSTITUENTS_URL = (
     "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/master/data/constituents.csv"
 )
 LOGGER = get_logger("qmis.collectors.breadth")
+
+
+def _downloaded_symbols(raw_download: pd.DataFrame) -> set[str]:
+    if raw_download.empty:
+        return set()
+    if isinstance(raw_download.columns, pd.MultiIndex):
+        return {str(symbol) for symbol in raw_download.columns.get_level_values(0)}
+    return set()
 
 
 def normalize_constituent_symbol(symbol: str) -> str:
@@ -55,29 +64,46 @@ def fetch_breadth_market_download(
     if not symbols:
         return pd.DataFrame()
 
+    remaining_symbols = list(symbols)
+    batches: list[pd.DataFrame] = []
+
     try:
         LOGGER.info("Calling breadth primary download (%s symbols)", len(symbols))
-        fast_download = fetch_market_download(
-            period=period,
-            interval=interval,
-            tickers=symbols,
-            threads=True,
-            timeout_seconds=request_timeout_seconds,
-        )
+        yfinance_logger = logging.getLogger("yfinance")
+        previous_level = yfinance_logger.level
+        yfinance_logger.setLevel(logging.CRITICAL)
+        try:
+            fast_download = fetch_market_download(
+                period=period,
+                interval=interval,
+                tickers=symbols,
+                threads=True,
+                timeout_seconds=request_timeout_seconds,
+            )
+        finally:
+            yfinance_logger.setLevel(previous_level)
         LOGGER.info("Completed breadth primary download (%s symbols)", len(symbols))
         if not fast_download.empty:
-            return fast_download.sort_index(axis=1)
+            batches.append(fast_download)
+            covered_symbols = _downloaded_symbols(fast_download)
+            remaining_symbols = [symbol for symbol in symbols if symbol not in covered_symbols]
+            if not remaining_symbols:
+                return fast_download.sort_index(axis=1)
+            LOGGER.warning(
+                "Breadth primary download missed %s symbols; refilling via safe batches",
+                len(remaining_symbols),
+            )
     except Exception as exc:
         LOGGER.warning(
             "Breadth primary download failed; falling back to safe batches: %s",
             exc,
         )
+        remaining_symbols = list(symbols)
 
     symbol_batches = [
-        symbols[start_index : start_index + chunk_size]
-        for start_index in range(0, len(symbols), chunk_size)
+        remaining_symbols[start_index : start_index + chunk_size]
+        for start_index in range(0, len(remaining_symbols), chunk_size)
     ]
-    batches: list[pd.DataFrame] = []
     for batch_index, batch_symbols in enumerate(symbol_batches):
         LOGGER.info(
             "Calling breadth fallback batch %s/%s (%s symbols)",
