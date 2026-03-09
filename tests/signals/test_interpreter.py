@@ -147,6 +147,27 @@ class OperatorInterpreterTests(unittest.TestCase):
                     "source": "derived_breadth",
                     "metadata": {},
                 },
+                "advance_decline_line": {
+                    "value": -420.0,
+                    "unit": "count",
+                    "category": "breadth",
+                    "source": "derived_breadth",
+                    "metadata": {},
+                },
+                "new_highs": {
+                    "value": 12.0,
+                    "unit": "count",
+                    "category": "breadth",
+                    "source": "derived_breadth",
+                    "metadata": {},
+                },
+                "new_lows": {
+                    "value": 88.0,
+                    "unit": "count",
+                    "category": "breadth",
+                    "source": "derived_breadth",
+                    "metadata": {},
+                },
                 "BTCUSD": {
                     "value": 66642.79,
                     "unit": "usd",
@@ -169,6 +190,9 @@ class OperatorInterpreterTests(unittest.TestCase):
                 "m2_money_supply": {"trend_label": "UP"},
                 "pmi": {"trend_label": "DOWN"},
                 "sp500_above_200dma": {"trend_label": "DOWN"},
+                "advance_decline_line": {"trend_label": "DOWN"},
+                "new_highs": {"trend_label": "DOWN"},
+                "new_lows": {"trend_label": "UP"},
                 "BTCUSD": {"trend_label": "DOWN"},
                 "ETHUSD": {"trend_label": "SIDEWAYS"},
             },
@@ -288,6 +312,17 @@ class OperatorInterpreterTests(unittest.TestCase):
                 },
                 "missing_inputs": [],
             },
+            "breadth_health": {
+                "breadth_score": 28.4,
+                "breadth_state": "FRAGILE",
+                "summary": "Breadth is fragile as participation narrows and new lows dominate.",
+                "components": {
+                    "advance_decline_line": {"score": -0.55, "weight": 0.3},
+                    "sp500_above_200dma": {"score": -0.62, "weight": 0.4},
+                    "new_highs_vs_lows": {"score": -0.71, "weight": 0.3},
+                },
+                "missing_inputs": [],
+            },
             "anomalies": [
                 {
                     "series_x": "BTCUSD",
@@ -344,10 +379,12 @@ class OperatorInterpreterTests(unittest.TestCase):
         self.assertEqual(intelligence["market_pulse"][1]["state"], "DOWN")
         self.assertEqual(intelligence["risk_monitor"]["volatility_risk"]["level"], "HIGH")
         self.assertEqual(intelligence["risk_monitor"]["liquidity_risk"]["level"], "HIGH")
+        self.assertEqual(intelligence["risk_monitor"]["breadth_risk"]["level"], "HIGH")
         self.assertEqual(intelligence["risk_monitor"]["growth_risk"]["level"], "HIGH")
         self.assertEqual(intelligence["risk_monitor"]["systemic_risk"]["level"], "CRITICAL")
         self.assertEqual(intelligence["market_stress"]["stress_level"], "HIGH")
         self.assertEqual(intelligence["liquidity_environment"]["liquidity_state"], "TIGHTENING")
+        self.assertEqual(intelligence["breadth_health"]["breadth_state"], "FRAGILE")
         self.assertIn("breadth", intelligence["market_stress"]["summary"].lower())
         self.assertTrue(intelligence["experimental_signals"]["visible"])
 

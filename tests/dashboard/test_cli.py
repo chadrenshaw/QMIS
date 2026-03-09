@@ -34,6 +34,9 @@ class QMISDashboardCLITests(unittest.TestCase):
                 {"ts": ts, "source": "test", "category": "crypto", "series_name": "ETHUSD", "value": 5100.0, "unit": "usd", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "crypto", "series_name": "BTC_dominance", "value": 58.0, "unit": "percent", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "breadth", "series_name": "sp500_above_200dma", "value": 71.0, "unit": "percent", "metadata": "{}"},
+                {"ts": ts, "source": "test", "category": "breadth", "series_name": "advance_decline_line", "value": 1880.0, "unit": "count", "metadata": "{}"},
+                {"ts": ts, "source": "test", "category": "breadth", "series_name": "new_highs", "value": 68.0, "unit": "count", "metadata": "{}"},
+                {"ts": ts, "source": "test", "category": "breadth", "series_name": "new_lows", "value": 14.0, "unit": "count", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "market", "series_name": "vix", "value": 19.0, "unit": "index_points", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "macro", "series_name": "yield_10y", "value": 4.2, "unit": "percent", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "macro", "series_name": "yield_3m", "value": 3.8, "unit": "percent", "metadata": "{}"},
@@ -69,6 +72,9 @@ class QMISDashboardCLITests(unittest.TestCase):
                 {"ts": ts, "series_name": "ETHUSD", "pct_change_30d": 9.0, "pct_change_90d": 16.0, "pct_change_365d": 70.0, "zscore_30d": 1.4, "volatility_30d": 0.5, "slope_30d": 0.9, "drawdown_90d": -10.0, "trend_label": "UP"},
                 {"ts": ts, "series_name": "BTC_dominance", "pct_change_30d": -6.0, "pct_change_90d": -2.0, "pct_change_365d": 4.0, "zscore_30d": -1.1, "volatility_30d": 0.2, "slope_30d": -0.2, "drawdown_90d": -5.0, "trend_label": "DOWN"},
                 {"ts": ts, "series_name": "sp500_above_200dma", "pct_change_30d": 6.0, "pct_change_90d": 9.0, "pct_change_365d": 18.0, "zscore_30d": 0.9, "volatility_30d": 0.2, "slope_30d": 0.3, "drawdown_90d": -4.0, "trend_label": "UP"},
+                {"ts": ts, "series_name": "advance_decline_line", "pct_change_30d": 8.0, "pct_change_90d": 10.0, "pct_change_365d": 20.0, "zscore_30d": 1.2, "volatility_30d": 0.2, "slope_30d": 0.4, "drawdown_90d": -2.0, "trend_label": "UP"},
+                {"ts": ts, "series_name": "new_highs", "pct_change_30d": 16.0, "pct_change_90d": 18.0, "pct_change_365d": 30.0, "zscore_30d": 1.0, "volatility_30d": 0.3, "slope_30d": 0.3, "drawdown_90d": -1.0, "trend_label": "UP"},
+                {"ts": ts, "series_name": "new_lows", "pct_change_30d": -14.0, "pct_change_90d": -18.0, "pct_change_365d": -24.0, "zscore_30d": -0.9, "volatility_30d": 0.3, "slope_30d": -0.2, "drawdown_90d": -2.0, "trend_label": "DOWN"},
                 {"ts": ts, "series_name": "vix", "pct_change_30d": -2.0, "pct_change_90d": -4.0, "pct_change_365d": 1.0, "zscore_30d": -0.4, "volatility_30d": 0.3, "slope_30d": -0.1, "drawdown_90d": -5.0, "trend_label": "SIDEWAYS"},
                 {"ts": ts, "series_name": "pmi", "pct_change_30d": 7.0, "pct_change_90d": 10.0, "pct_change_365d": 12.0, "zscore_30d": 1.2, "volatility_30d": 0.1, "slope_30d": 0.2, "drawdown_90d": -1.5, "trend_label": "UP"},
                 {"ts": ts, "series_name": "fed_balance_sheet", "pct_change_30d": 5.0, "pct_change_90d": 7.0, "pct_change_365d": 14.0, "zscore_30d": 0.8, "volatility_30d": 0.1, "slope_30d": 0.1, "drawdown_90d": -2.0, "trend_label": "SIDEWAYS"},
@@ -160,6 +166,24 @@ class QMISDashboardCLITests(unittest.TestCase):
                             "reverse_repo_usage": {"score": 0.64, "weight": 0.2},
                             "dollar_index": {"score": 0.28, "weight": 0.15},
                             "real_yields": {"score": 0.35, "weight": 0.15},
+                        }
+                    ),
+                    "missing_inputs": json.dumps([]),
+                }
+            ]
+        )
+        breadth_health = pd.DataFrame(
+            [
+                {
+                    "ts": ts,
+                    "breadth_score": 71.2,
+                    "breadth_state": "STRONG",
+                    "summary": "Breadth is strong with broad participation and positive high-low expansion.",
+                    "components": json.dumps(
+                        {
+                            "advance_decline_line": {"score": 0.58, "weight": 0.3},
+                            "sp500_above_200dma": {"score": 0.64, "weight": 0.4},
+                            "new_highs_vs_lows": {"score": 0.72, "weight": 0.3},
                         }
                     ),
                     "missing_inputs": json.dumps([]),
@@ -298,6 +322,7 @@ class QMISDashboardCLITests(unittest.TestCase):
                 ("features", features),
                 ("factors", factors),
                 ("stress_snapshots", stress),
+                ("breadth_snapshots", breadth_health),
                 ("liquidity_snapshots", liquidity_environment),
                 ("regimes", regimes),
                 ("relationships", relationships),
@@ -335,6 +360,7 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertEqual(snapshot["factors"][0]["direction"], "tightening")
         self.assertEqual(snapshot["market_stress"]["stress_level"], "HIGH")
         self.assertEqual(snapshot["market_stress"]["missing_inputs"], ["credit"])
+        self.assertEqual(snapshot["breadth_health"]["breadth_state"], "STRONG")
         self.assertEqual(snapshot["liquidity_environment"]["liquidity_state"], "EXPANDING")
         self.assertEqual(
             snapshot["intelligence"]["global_state_line"],
@@ -343,8 +369,10 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertIn("Sun: Pisces", snapshot["intelligence"]["cosmic_state_line"])
         self.assertEqual(snapshot["intelligence"]["market_drivers"][0]["title"], "Liquidity Tightening")
         self.assertEqual(snapshot["intelligence"]["market_stress"]["stress_level"], "HIGH")
+        self.assertEqual(snapshot["intelligence"]["breadth_health"]["breadth_state"], "STRONG")
         self.assertEqual(snapshot["intelligence"]["liquidity_environment"]["liquidity_state"], "EXPANDING")
         self.assertEqual(snapshot["intelligence"]["relationship_shifts"][0]["title"], "Crypto vs Macro Decoupling")
+        self.assertEqual(snapshot["intelligence"]["risk_monitor"]["breadth_risk"]["level"], "LOW")
         self.assertEqual(snapshot["intelligence"]["risk_monitor"]["systemic_risk"]["level"], "HIGH")
 
     def test_render_dashboard_writes_required_sections(self) -> None:
@@ -372,6 +400,8 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertIn("Solar: ELEVATED", output)
         self.assertIn("MARKET STRESS", output)
         self.assertIn("HIGH", output)
+        self.assertIn("BREADTH HEALTH", output)
+        self.assertIn("STRONG", output)
         self.assertIn("LIQUIDITY ENVIRONMENT", output)
         self.assertIn("EXPANDING", output)
         self.assertIn("PRIMARY MARKET DRIVERS", output)

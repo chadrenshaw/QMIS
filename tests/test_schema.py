@@ -36,6 +36,7 @@ class QMISSchemaTests(unittest.TestCase):
                 "collector_runs",
                 "factors",
                 "features",
+                "breadth_snapshots",
                 "liquidity_snapshots",
                 "regimes",
                 "relationships",
@@ -68,6 +69,10 @@ class QMISSchemaTests(unittest.TestCase):
                 stress_columns = {
                     row[1]
                     for row in connection.execute("PRAGMA table_info('stress_snapshots')").fetchall()
+                }
+                breadth_columns = {
+                    row[1]
+                    for row in connection.execute("PRAGMA table_info('breadth_snapshots')").fetchall()
                 }
                 liquidity_columns = {
                     row[1]
@@ -130,6 +135,17 @@ class QMISSchemaTests(unittest.TestCase):
                 "ts",
                 "stress_score",
                 "stress_level",
+                "summary",
+                "components",
+                "missing_inputs",
+            },
+        )
+        self.assertEqual(
+            breadth_columns,
+            {
+                "ts",
+                "breadth_score",
+                "breadth_state",
                 "summary",
                 "components",
                 "missing_inputs",

@@ -56,6 +56,16 @@ SCHEMA_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS breadth_snapshots (
+        ts TIMESTAMP,
+        breadth_score DOUBLE,
+        breadth_state TEXT,
+        summary TEXT,
+        components JSON,
+        missing_inputs JSON
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS liquidity_snapshots (
         ts TIMESTAMP,
         liquidity_score DOUBLE,

@@ -31,6 +31,12 @@ class QMISAPITests(unittest.TestCase):
                 {"ts": ts, "source": "test", "category": "market", "series_name": "oil", "value": 84.5, "unit": "usd", "metadata": "{}"},
                 {"ts": prev_ts, "source": "test", "category": "crypto", "series_name": "BTCUSD", "value": 93500.0, "unit": "usd", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "crypto", "series_name": "BTCUSD", "value": 95000.0, "unit": "usd", "metadata": "{}"},
+                {"ts": prev_ts, "source": "test", "category": "breadth", "series_name": "sp500_above_200dma", "value": 64.0, "unit": "percent", "metadata": "{}"},
+                {"ts": ts, "source": "test", "category": "breadth", "series_name": "sp500_above_200dma", "value": 58.0, "unit": "percent", "metadata": "{}"},
+                {"ts": prev_ts, "source": "test", "category": "breadth", "series_name": "advance_decline_line", "value": 1240.0, "unit": "count", "metadata": "{}"},
+                {"ts": ts, "source": "test", "category": "breadth", "series_name": "advance_decline_line", "value": 910.0, "unit": "count", "metadata": "{}"},
+                {"ts": ts, "source": "test", "category": "breadth", "series_name": "new_highs", "value": 28.0, "unit": "count", "metadata": "{}"},
+                {"ts": ts, "source": "test", "category": "breadth", "series_name": "new_lows", "value": 25.0, "unit": "count", "metadata": "{}"},
                 {"ts": prev_ts, "source": "test", "category": "liquidity", "series_name": "fed_balance_sheet", "value": 7050.0, "unit": "billions_usd", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "liquidity", "series_name": "fed_balance_sheet", "value": 7100.0, "unit": "billions_usd", "metadata": "{}"},
                 {"ts": prev_ts, "source": "test", "category": "macro", "series_name": "yield_10y", "value": 4.1, "unit": "percent", "metadata": "{}"},
@@ -45,6 +51,10 @@ class QMISAPITests(unittest.TestCase):
                 {"ts": ts, "series_name": "gold", "pct_change_30d": 7.0, "pct_change_90d": 12.0, "pct_change_365d": 20.0, "zscore_30d": 1.1, "volatility_30d": 0.1, "slope_30d": 0.3, "drawdown_90d": -1.0, "trend_label": "UP"},
                 {"ts": ts, "series_name": "BTCUSD", "pct_change_30d": 8.0, "pct_change_90d": 14.0, "pct_change_365d": 52.0, "zscore_30d": 1.3, "volatility_30d": 0.4, "slope_30d": 0.45, "drawdown_90d": -6.0, "trend_label": "UP"},
                 {"ts": ts, "series_name": "fed_balance_sheet", "pct_change_30d": 1.0, "pct_change_90d": 2.0, "pct_change_365d": 4.0, "zscore_30d": 0.4, "volatility_30d": 0.05, "slope_30d": 0.1, "drawdown_90d": -0.4, "trend_label": "SIDEWAYS"},
+                {"ts": ts, "series_name": "sp500_above_200dma", "pct_change_30d": -4.0, "pct_change_90d": -6.0, "pct_change_365d": 3.0, "zscore_30d": -0.3, "volatility_30d": 0.2, "slope_30d": -0.1, "drawdown_90d": -4.0, "trend_label": "DOWN"},
+                {"ts": ts, "series_name": "advance_decline_line", "pct_change_30d": -3.0, "pct_change_90d": -4.0, "pct_change_365d": 2.0, "zscore_30d": -0.2, "volatility_30d": 0.2, "slope_30d": -0.1, "drawdown_90d": -3.0, "trend_label": "DOWN"},
+                {"ts": ts, "series_name": "new_highs", "pct_change_30d": -8.0, "pct_change_90d": -10.0, "pct_change_365d": 4.0, "zscore_30d": -0.5, "volatility_30d": 0.2, "slope_30d": -0.2, "drawdown_90d": -5.0, "trend_label": "DOWN"},
+                {"ts": ts, "series_name": "new_lows", "pct_change_30d": 9.0, "pct_change_90d": 11.0, "pct_change_365d": -3.0, "zscore_30d": 0.6, "volatility_30d": 0.3, "slope_30d": 0.2, "drawdown_90d": -1.0, "trend_label": "UP"},
             ]
         )
         regimes = pd.DataFrame(
@@ -130,12 +140,25 @@ class QMISAPITests(unittest.TestCase):
                 }
             ]
         )
+        breadth_health = pd.DataFrame(
+            [
+                {
+                    "ts": ts,
+                    "breadth_score": 51.2,
+                    "breadth_state": "WEAKENING",
+                    "summary": "Breadth is weakening as participation slips and highs no longer dominate lows.",
+                    "components": '{"advance_decline_line": {"score": -0.18}, "sp500_above_200dma": {"score": -0.10}, "new_highs_vs_lows": {"score": -0.06}}',
+                    "missing_inputs": '[]',
+                }
+            ]
+        )
 
         with connect_db(db_path) as connection:
             for table_name, payload in (
                 ("signals", signals),
                 ("features", features),
                 ("stress_snapshots", stress),
+                ("breadth_snapshots", breadth_health),
                 ("liquidity_snapshots", liquidity_environment),
                 ("regimes", regimes),
                 ("relationships", relationships),
@@ -192,6 +215,7 @@ class QMISAPITests(unittest.TestCase):
         self.assertGreaterEqual(len(dashboard.json()["alerts"]), 3)
         self.assertEqual(dashboard.json()["market_stress"]["stress_level"], "HIGH")
         self.assertEqual(dashboard.json()["market_stress"]["missing_inputs"], ["credit"])
+        self.assertEqual(dashboard.json()["breadth_health"]["breadth_state"], "WEAKENING")
         self.assertEqual(dashboard.json()["liquidity_environment"]["liquidity_state"], "NEUTRAL")
         self.assertIn("market", dashboard.json()["signal_groups"])
         self.assertIn("gold", dashboard.json()["signal_groups"]["market"])

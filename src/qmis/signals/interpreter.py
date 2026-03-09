@@ -36,6 +36,11 @@ def _liquidity_environment(snapshot: dict[str, Any]) -> dict[str, Any]:
     return dict(liquidity) if isinstance(liquidity, dict) else {}
 
 
+def _breadth_health(snapshot: dict[str, Any]) -> dict[str, Any]:
+    breadth = snapshot.get("breadth_health")
+    return dict(breadth) if isinstance(breadth, dict) else {}
+
+
 def _trend(snapshot: dict[str, Any], series_name: str) -> str:
     trend_label = snapshot.get("trend_summary", {}).get(series_name, {}).get("trend_label")
     return str(trend_label) if trend_label is not None else "N/A"
@@ -346,8 +351,12 @@ def _liquidity_descriptor(snapshot: dict[str, Any]) -> str:
 
 
 def _growth_descriptor(snapshot: dict[str, Any]) -> str:
+    breadth_snapshot = _breadth_health(snapshot)
+    breadth_state = str(breadth_snapshot.get("breadth_state", "")).upper()
     pmi = _signal_value(snapshot, "pmi")
     breadth = _signal_value(snapshot, "sp500_above_200dma")
+    if breadth_state == "FRAGILE":
+        return "WEAK"
     if pmi is not None and pmi < 50.0:
         return "WEAK"
     if breadth is not None and breadth < 50.0:
@@ -477,6 +486,8 @@ def build_risk_monitor(snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
     anomaly_count = len(snapshot.get("anomalies", []))
     base_risk = int(snapshot.get("scores", {}).get("risk_score", 0))
 
+    breadth_snapshot = _breadth_health(snapshot)
+    breadth_state = str(breadth_snapshot.get("breadth_state", "")).upper()
     liquidity_snapshot = _liquidity_environment(snapshot)
     liquidity_state = str(liquidity_snapshot.get("liquidity_state") or _liquidity_descriptor(snapshot)).upper()
 
@@ -486,6 +497,19 @@ def build_risk_monitor(snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
         liquidity_level = "LOW"
     else:
         liquidity_level = "MODERATE"
+
+    if breadth_state == "FRAGILE":
+        breadth_level = "HIGH"
+    elif breadth_state == "WEAKENING":
+        breadth_level = "MODERATE"
+    elif breadth_state == "STRONG":
+        breadth_level = "LOW"
+    elif breadth is not None and breadth < 50.0:
+        breadth_level = "HIGH"
+    elif breadth is not None and breadth < 60.0:
+        breadth_level = "MODERATE"
+    else:
+        breadth_level = "LOW"
 
     if pmi is not None and pmi < 48.0 or (breadth is not None and breadth < 50.0):
         growth_level = "HIGH"
@@ -503,6 +527,8 @@ def build_risk_monitor(snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
         systemic_score += 1
     if critical_alerts >= 2:
         systemic_score += 1
+    if breadth_state == "FRAGILE":
+        systemic_score += 1
 
     if systemic_score >= 5:
         systemic_level = "CRITICAL"
@@ -517,6 +543,10 @@ def build_risk_monitor(snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
 
     return {
         "volatility_risk": {"level": _risk_level_from_vix(vix), "summary": "Derived from the current VIX regime."},
+        "breadth_risk": {
+            "level": breadth_level,
+            "summary": str(breadth_snapshot.get("summary") or "Tracks participation and high-low expansion."),
+        },
         "liquidity_risk": {
             "level": liquidity_level,
             "summary": str(liquidity_snapshot.get("summary") or "Tracks tightening or easing liquidity conditions."),
@@ -586,13 +616,22 @@ def generate_operator_watchlist(snapshot: dict[str, Any]) -> list[dict[str, Any]
     """Create a short operator watchlist from the interpreted state."""
     risk = generate_risk_indicators(snapshot)
     relationship_changes = summarize_relationship_breaks(snapshot)
+    breadth_snapshot = _breadth_health(snapshot)
 
     watch_items: list[dict[str, Any]] = []
     for change in relationship_changes[:2]:
         watch_items.append({"title": change["title"], "detail": change["summary"]})
 
     breadth = _signal_value(snapshot, "sp500_above_200dma")
-    if breadth is not None and (breadth < 55.0 or _trend(snapshot, "sp500_above_200dma") == "DOWN"):
+    breadth_state = str(breadth_snapshot.get("breadth_state", "")).upper()
+    if breadth_state in {"WEAKENING", "FRAGILE"}:
+        watch_items.append(
+            {
+                "title": "Breadth deterioration",
+                "detail": str(breadth_snapshot.get("summary") or "Participation is narrowing."),
+            }
+        )
+    elif breadth is not None and (breadth < 55.0 or _trend(snapshot, "sp500_above_200dma") == "DOWN"):
         watch_items.append(
             {
                 "title": "Breadth deterioration",
@@ -633,11 +672,15 @@ def generate_operator_watchlist(snapshot: dict[str, Any]) -> list[dict[str, Any]
 def build_warning_signals(snapshot: dict[str, Any]) -> list[dict[str, str]]:
     warnings: list[dict[str, str]] = []
     shifts = summarize_relationship_breaks(snapshot)
+    breadth_snapshot = _breadth_health(snapshot)
     if shifts:
         warnings.append({"title": shifts[0]["title"], "detail": shifts[0]["summary"]})
 
     breadth = _signal_value(snapshot, "sp500_above_200dma")
-    if breadth is not None and (breadth < 55.0 or _trend(snapshot, "sp500_above_200dma") == "DOWN"):
+    breadth_state = str(breadth_snapshot.get("breadth_state", "")).upper()
+    if breadth_state in {"WEAKENING", "FRAGILE"}:
+        warnings.append({"title": "Breadth deterioration", "detail": str(breadth_snapshot.get("summary") or "Participation is narrowing.")})
+    elif breadth is not None and (breadth < 55.0 or _trend(snapshot, "sp500_above_200dma") == "DOWN"):
         warnings.append({"title": "Breadth deterioration", "detail": f"Participation has slipped to {breadth:.2f}% above 200DMA."})
 
     vix = _signal_value(snapshot, "vix")
@@ -673,6 +716,7 @@ def build_operator_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "market_pulse": build_market_pulse(snapshot),
         "cosmic_state_line": build_cosmic_state_line(snapshot, world_state),
         "market_stress": snapshot.get("market_stress"),
+        "breadth_health": snapshot.get("breadth_health"),
         "liquidity_environment": snapshot.get("liquidity_environment"),
         "market_drivers": build_market_drivers(snapshot),
         "relationship_shifts": relationship_changes,
