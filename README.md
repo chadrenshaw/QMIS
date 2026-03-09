@@ -125,7 +125,7 @@ QMIS_IMAGE=qmis:local docker compose up
 
 ## Woodpecker CI/CD
 
-The repository now expects container build and publishing to happen in Woodpecker via [.woodpecker.yml](/Users/crenshaw/Projects/QMIS/.woodpecker.yml).
+The repository now expects container build and publishing to happen in Woodpecker via [.woodpecker.yaml](/Users/crenshaw/Projects/QMIS/.woodpecker.yaml).
 
 Pipeline behavior:
 

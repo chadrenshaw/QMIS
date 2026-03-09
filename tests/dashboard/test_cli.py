@@ -1,4 +1,5 @@
 import io
+import json
 import sys
 import tempfile
 import unittest
@@ -39,8 +40,21 @@ class QMISDashboardCLITests(unittest.TestCase):
                 {"ts": ts, "source": "test", "category": "macro", "series_name": "pmi", "value": 52.1, "unit": "index_points", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "liquidity", "series_name": "fed_balance_sheet", "value": 7420.0, "unit": "usd_billions", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "liquidity", "series_name": "reverse_repo_usage", "value": 311.0, "unit": "usd_billions", "metadata": "{}"},
+                {"ts": ts, "source": "test", "category": "astronomy", "series_name": "solar_longitude", "value": 348.06, "unit": "degrees", "metadata": "{}"},
+                {
+                    "ts": ts,
+                    "source": "test",
+                    "category": "astronomy",
+                    "series_name": "zodiac_index",
+                    "value": 11.0,
+                    "unit": "index",
+                    "metadata": json.dumps({"zodiac_sign": "Pisces"}),
+                },
+                {"ts": ts, "source": "test", "category": "astronomy", "series_name": "lunar_cycle_day", "value": 20.0, "unit": "days", "metadata": "{}"},
+                {"ts": ts, "source": "test", "category": "astronomy", "series_name": "lunar_illumination", "value": 72.09, "unit": "percent", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "astronomy", "series_name": "sunspot_number", "value": 156.0, "unit": "count", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "astronomy", "series_name": "solar_flare_count", "value": 4.0, "unit": "count", "metadata": "{}"},
+                {"ts": ts, "source": "test", "category": "astronomy", "series_name": "solar_flux_f107", "value": 122.0, "unit": "sfu", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "natural", "series_name": "geomagnetic_kp", "value": 5.0, "unit": "index_points", "metadata": "{}"},
                 {"ts": ts, "source": "test", "category": "natural", "series_name": "earthquake_count", "value": 21.0, "unit": "count", "metadata": "{}"},
             ]
@@ -104,6 +118,39 @@ class QMISDashboardCLITests(unittest.TestCase):
                 },
                 {
                     "ts": ts,
+                    "series_x": "BTCUSD",
+                    "series_y": "ETHUSD",
+                    "window_days": 90,
+                    "lag_days": 0,
+                    "correlation": 0.91,
+                    "p_value": 0.0002,
+                    "relationship_state": "stable",
+                    "confidence_label": "validated",
+                },
+                {
+                    "ts": ts,
+                    "series_x": "fed_balance_sheet",
+                    "series_y": "BTCUSD",
+                    "window_days": 90,
+                    "lag_days": 0,
+                    "correlation": 0.79,
+                    "p_value": 0.0004,
+                    "relationship_state": "stable",
+                    "confidence_label": "validated",
+                },
+                {
+                    "ts": ts,
+                    "series_x": "vix",
+                    "series_y": "sp500_above_200dma",
+                    "window_days": 90,
+                    "lag_days": 0,
+                    "correlation": -0.76,
+                    "p_value": 0.001,
+                    "relationship_state": "stable",
+                    "confidence_label": "validated",
+                },
+                {
+                    "ts": ts,
                     "series_x": "gold",
                     "series_y": "yield_10y",
                     "window_days": 30,
@@ -115,14 +162,58 @@ class QMISDashboardCLITests(unittest.TestCase):
                 },
                 {
                     "ts": ts,
+                    "series_x": "BTCUSD",
+                    "series_y": "yield_10y",
+                    "window_days": 365,
+                    "lag_days": 0,
+                    "correlation": -0.72,
+                    "p_value": 0.0006,
+                    "relationship_state": "stable",
+                    "confidence_label": "validated",
+                },
+                {
+                    "ts": ts,
+                    "series_x": "BTCUSD",
+                    "series_y": "yield_10y",
+                    "window_days": 30,
+                    "lag_days": 0,
+                    "correlation": -0.08,
+                    "p_value": 0.41,
+                    "relationship_state": "broken",
+                    "confidence_label": "likely_spurious",
+                },
+                {
+                    "ts": ts,
+                    "series_x": "ETHUSD",
+                    "series_y": "yield_3m",
+                    "window_days": 365,
+                    "lag_days": 0,
+                    "correlation": -0.71,
+                    "p_value": 0.0008,
+                    "relationship_state": "stable",
+                    "confidence_label": "validated",
+                },
+                {
+                    "ts": ts,
+                    "series_x": "ETHUSD",
+                    "series_y": "yield_3m",
+                    "window_days": 30,
+                    "lag_days": 0,
+                    "correlation": 0.02,
+                    "p_value": 0.77,
+                    "relationship_state": "broken",
+                    "confidence_label": "likely_spurious",
+                },
+                {
+                    "ts": ts,
                     "series_x": "sunspot_number",
                     "series_y": "BTCUSD",
                     "window_days": 365,
-                    "lag_days": 28,
-                    "correlation": 0.63,
+                    "lag_days": 0,
+                    "correlation": 0.82,
                     "p_value": 0.01,
-                    "relationship_state": "exploratory",
-                    "confidence_label": "exploratory",
+                    "relationship_state": "stable",
+                    "confidence_label": "validated",
                 },
             ]
         )
@@ -157,11 +248,17 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertIn("breadth", snapshot["signal_groups"])
         self.assertIn("astronomy", snapshot["signal_groups"])
         self.assertIn("natural", snapshot["signal_groups"])
-        self.assertEqual(len(snapshot["top_relationships"]), 2)
-        self.assertEqual(len(snapshot["lead_lag_relationships"]), 1)
-        self.assertEqual(len(snapshot["anomalies"]), 1)
+        self.assertEqual(snapshot["signal_summary"]["zodiac_index"]["metadata"]["zodiac_sign"], "Pisces")
+        self.assertEqual(len(snapshot["top_relationships"]), 3)
+        self.assertEqual(len(snapshot["lead_lag_relationships"]), 0)
+        self.assertEqual(len(snapshot["anomalies"]), 3)
         self.assertEqual(snapshot["alert_summary"]["status"], "active")
         self.assertGreaterEqual(len(snapshot["alerts"]), 2)
+        self.assertEqual(snapshot["intelligence"]["world_state"]["sun_sign"], "Pisces")
+        self.assertEqual(snapshot["intelligence"]["world_state"]["lunar_phase"], "Waning Gibbous")
+        self.assertEqual(snapshot["intelligence"]["market_forces"][0]["theme"], "crypto_factor")
+        self.assertEqual(snapshot["intelligence"]["relationship_changes"][0]["title"], "Crypto vs Macro Decoupling")
+        self.assertIn("volatility", snapshot["intelligence"]["risk_indicators"])
 
     def test_render_dashboard_writes_required_sections(self) -> None:
         from qmis.alerts.engine import materialize_alerts
@@ -178,23 +275,21 @@ class QMISDashboardCLITests(unittest.TestCase):
             render_dashboard(snapshot, console=console)
 
         output = buffer.getvalue()
-        self.assertIn("GLOBAL MACRO DASHBOARD", output)
-        self.assertIn("Gold Trend", output)
-        self.assertIn("Market Signals", output)
-        self.assertIn("Crypto Signals", output)
-        self.assertIn("Breadth Signals", output)
-        self.assertIn("Liquidity Signals", output)
-        self.assertIn("Astronomy Signals", output)
-        self.assertIn("Natural Signals", output)
-        self.assertIn("BTC_dominance", output)
-        self.assertIn("sunspot_number", output)
-        self.assertIn("geomagnetic_kp", output)
-        self.assertIn("Macro Scores", output)
-        self.assertIn("Current Regime", output)
+        self.assertIn("OPERATOR INTELLIGENCE SNAPSHOT", output)
+        self.assertIn("World State Snapshot", output)
+        self.assertIn("Pisces", output)
+        self.assertIn("Waning Gibbous", output)
+        self.assertIn("Macro Regime", output)
         self.assertIn("STAGFLATION RISK", output)
-        self.assertIn("Top Relationships", output)
-        self.assertIn("Anomalies", output)
-        self.assertIn("Lead-Lag", output)
+        self.assertIn("Dominant Market Forces", output)
+        self.assertIn("liquidity_factor", output)
+        self.assertIn("Key Relationship Changes", output)
+        self.assertIn("Crypto vs Macro Decoupling", output)
+        self.assertIn("Macro Risk Indicators", output)
+        self.assertIn("Significant Correlations", output)
+        self.assertIn("Experimental Signals", output)
+        self.assertIn("sunspot_number", output)
+        self.assertIn("What To Watch", output)
         self.assertIn("Alerts", output)
 
 

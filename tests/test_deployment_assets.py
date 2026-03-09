@@ -16,7 +16,7 @@ class QMISDeploymentAssetTests(unittest.TestCase):
         dockerignore = REPO_ROOT / ".dockerignore"
         entrypoint = REPO_ROOT / "docker" / "entrypoint.sh"
         compose_file = REPO_ROOT / "docker-compose.yml"
-        woodpecker_file = REPO_ROOT / ".woodpecker.yml"
+        woodpecker_file = REPO_ROOT / ".woodpecker.yaml"
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         compose = compose_file.read_text(encoding="utf-8") if compose_file.exists() else ""
         woodpecker = woodpecker_file.read_text(encoding="utf-8") if woodpecker_file.exists() else ""
