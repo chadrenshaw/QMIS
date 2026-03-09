@@ -106,6 +106,13 @@ class QMISAlertRuleTests(unittest.TestCase):
                 }
             ]
         )
+        macro_pressure = {
+            "ts": pd.Timestamp("2026-03-08"),
+            "mpi_score": 88.0,
+            "pressure_level": "CRISIS CONDITIONS",
+            "summary": "Macro pressure is crisis conditions led by volatility regime, breadth deterioration, credit spread widening.",
+            "primary_contributors": ["volatility regime", "breadth deterioration", "credit spread widening"],
+        }
 
         alerts = evaluate_alert_rules(
             latest_regime=latest_regime,
@@ -114,12 +121,15 @@ class QMISAlertRuleTests(unittest.TestCase):
             relationships=relationships,
             anomalies=anomalies,
             cycles=cycles,
+            macro_pressure=macro_pressure,
         )
 
-        self.assertEqual(set(alerts["alert_type"]), {"regime_change", "threshold", "correlation_discovery", "relationship_break", "cycle_phase_transition"})
+        self.assertEqual(set(alerts["alert_type"]), {"regime_change", "threshold", "correlation_discovery", "relationship_break", "cycle_phase_transition", "macro_pressure"})
         self.assertIn("regime_change:INFLATIONARY EXPANSION->CRISIS / RISK-OFF", set(alerts["dedupe_key"]))
         self.assertIn("threshold:yield_curve_inversion", set(alerts["dedupe_key"]))
         self.assertIn("threshold:vix_stress", set(alerts["dedupe_key"]))
+        self.assertIn("macro_pressure:high", set(alerts["dedupe_key"]))
+        self.assertIn("macro_pressure:crisis", set(alerts["dedupe_key"]))
         self.assertIn("correlation:sunspot_number:BTCUSD:365:28", set(alerts["dedupe_key"]))
         self.assertNotIn("relationship_break:gold:yield_10y:30", set(alerts["dedupe_key"]))
         self.assertIn("relationship_break:BTCUSD:fed_balance_sheet:30", set(alerts["dedupe_key"]))

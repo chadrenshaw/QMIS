@@ -22,10 +22,16 @@ class QMISMacroCollectorTests(unittest.TestCase):
         index = pd.to_datetime(["2026-03-05", "2026-03-06"])
         return {
             "DGS10": pd.Series([4.20, 4.25], index=index),
+            "DGS2": pd.Series([4.05, 4.10], index=index),
             "DGS3MO": pd.Series([4.55, 4.50], index=index),
+            "BAMLH0A0HYM2": pd.Series([3.85, 4.10], index=index),
+            "BAA10YM": pd.Series([2.20, 2.35], index=index),
+            "STLFSI4": pd.Series([0.11, 0.23], index=index),
             "M2SL": pd.Series([21800.0, 21820.0], index=index),
             "WALCL": pd.Series([6765000.0, 6768000.0], index=index),
             "RRPONTSYD": pd.Series([180.0, None], index=index),
+            "DFII10": pd.Series([1.85, 1.92], index=index),
+            "T10YIE": pd.Series([2.31, 2.28], index=index),
             "BSCICP02USM460S": pd.Series([51.2, 51.7], index=index),
         }
 
@@ -34,15 +40,21 @@ class QMISMacroCollectorTests(unittest.TestCase):
 
         signals = normalize_macro_signals(self._build_macro_series())
 
-        self.assertEqual(len(signals), 11)
+        self.assertEqual(len(signals), 23)
         self.assertEqual(
             set(signals["series_name"]),
             {
                 "yield_10y",
+                "yield_2y",
                 "yield_3m",
+                "high_yield_spread",
+                "baa_corporate_spread",
+                "financial_conditions_index",
                 "m2_money_supply",
                 "fed_balance_sheet",
                 "reverse_repo_usage",
+                "real_yields",
+                "breakeven_inflation_10y",
                 "pmi",
             },
         )
@@ -50,11 +62,13 @@ class QMISMacroCollectorTests(unittest.TestCase):
         self.assertTrue((signals["category"] == "macro").all())
         self.assertEqual(
             set(signals["unit"]),
-            {"billions_usd", "index_points", "millions_usd", "percent"},
+            {"billions_usd", "index_points", "millions_usd", "percent", "spread_points"},
         )
         reverse_repo_rows = signals.loc[signals["series_name"] == "reverse_repo_usage"]
         self.assertEqual(len(reverse_repo_rows), 1)
         self.assertEqual(reverse_repo_rows.iloc[0]["value"], 180.0)
+        credit_rows = signals.loc[signals["series_name"] == "high_yield_spread"].sort_values("ts")
+        self.assertEqual(list(credit_rows["value"]), [3.85, 4.1])
 
         metadata = json.loads(signals.loc[signals["series_name"] == "pmi"].iloc[0]["metadata"])
         self.assertEqual(metadata["series_id"], "BSCICP02USM460S")
@@ -92,16 +106,27 @@ class QMISMacroCollectorTests(unittest.TestCase):
             finally:
                 connection.close()
 
-        self.assertEqual(inserted_rows, 11)
-        self.assertEqual(len(persisted), 11)
+        self.assertEqual(inserted_rows, 23)
+        self.assertEqual(len(persisted), 23)
         self.assertEqual(
             persisted.iloc[0].to_dict(),
             {
                 "source": "fred",
                 "category": "macro",
-                "series_name": "fed_balance_sheet",
-                "value": 6765000.0,
-                "unit": "millions_usd",
+                "series_name": "baa_corporate_spread",
+                "value": 2.2,
+                "unit": "spread_points",
+            },
+        )
+        latest_financial_conditions = persisted.loc[persisted["series_name"] == "financial_conditions_index"].iloc[-1]
+        self.assertEqual(
+            latest_financial_conditions.to_dict(),
+            {
+                "source": "fred",
+                "category": "macro",
+                "series_name": "financial_conditions_index",
+                "value": 0.23,
+                "unit": "index_points",
             },
         )
 

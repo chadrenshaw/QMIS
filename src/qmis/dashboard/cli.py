@@ -77,6 +77,10 @@ def _parse_json_list(value: Any) -> list[Any]:
     return []
 
 
+def _titleize_signal_key(key: str) -> str:
+    return key.replace("_", " ").title()
+
+
 def _latest_rows(connection, table_name: str, value_columns: str = "*"):
     return connection.execute(
         f"""
@@ -109,6 +113,7 @@ def _build_freshness(
     latest_liquidity_ts: Any,
     latest_relationship_ts: Any,
     latest_stress_ts: Any,
+    latest_macro_pressure_ts: Any,
     latest_cycle_ts: Any,
 ) -> dict[str, Any]:
     timestamps = [
@@ -119,6 +124,7 @@ def _build_freshness(
             _coerce_timestamp(latest_liquidity_ts),
             _coerce_timestamp(latest_relationship_ts),
             _coerce_timestamp(latest_stress_ts),
+            _coerce_timestamp(latest_macro_pressure_ts),
             _coerce_timestamp(latest_cycle_ts),
         )
         if ts is not None
@@ -132,6 +138,7 @@ def _build_freshness(
             "latest_liquidity_ts": latest_liquidity_ts,
             "latest_relationship_ts": latest_relationship_ts,
             "latest_stress_ts": latest_stress_ts,
+            "latest_macro_pressure_ts": latest_macro_pressure_ts,
             "latest_cycle_ts": latest_cycle_ts,
         }
 
@@ -146,6 +153,7 @@ def _build_freshness(
         "latest_liquidity_ts": latest_liquidity_ts,
         "latest_relationship_ts": latest_relationship_ts,
         "latest_stress_ts": latest_stress_ts,
+        "latest_macro_pressure_ts": latest_macro_pressure_ts,
         "latest_cycle_ts": latest_cycle_ts,
         "age_days": age_days,
     }
@@ -189,7 +197,8 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         ).fetchdf()
         regime_rows = connection.execute(
             """
-            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence, regime_probabilities, regime_drivers
+            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence,
+                   regime_probabilities, regime_drivers, bayesian_evidence, forward_regime_forecast
             FROM regimes
             ORDER BY ts DESC
             LIMIT 1
@@ -210,6 +219,14 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
             LIMIT 1
             """
         ).fetchdf()
+        macro_pressure_rows = connection.execute(
+            """
+            SELECT ts, mpi_score, pressure_level, summary, components, primary_contributors, missing_inputs
+            FROM macro_pressure_snapshots
+            ORDER BY ts DESC
+            LIMIT 1
+            """
+        ).fetchdf()
         breadth_rows = connection.execute(
             """
             SELECT ts, breadth_score, breadth_state, summary, components, missing_inputs
@@ -222,6 +239,14 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
             """
             SELECT ts, liquidity_score, liquidity_state, summary, components, missing_inputs
             FROM liquidity_snapshots
+            ORDER BY ts DESC
+            LIMIT 1
+            """
+        ).fetchdf()
+        predictive_rows = connection.execute(
+            """
+            SELECT ts, summary, forward_macro_signals, missing_inputs
+            FROM predictive_snapshots
             ORDER BY ts DESC
             LIMIT 1
             """
@@ -268,7 +293,8 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         ).fetchdf()
         score_history_rows = connection.execute(
             """
-            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence, regime_probabilities, regime_drivers
+            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence,
+                   regime_probabilities, regime_drivers, bayesian_evidence, forward_regime_forecast
             FROM regimes
             ORDER BY ts ASC
             """
@@ -318,6 +344,19 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         if not stress_rows.empty
         else None
     )
+    macro_pressure = (
+        {
+            "ts": macro_pressure_rows.iloc[0]["ts"],
+            "mpi_score": float(macro_pressure_rows.iloc[0]["mpi_score"]),
+            "pressure_level": str(macro_pressure_rows.iloc[0]["pressure_level"]),
+            "summary": str(macro_pressure_rows.iloc[0]["summary"]),
+            "components": _parse_metadata(macro_pressure_rows.iloc[0]["components"]),
+            "primary_contributors": _parse_json_list(macro_pressure_rows.iloc[0]["primary_contributors"]),
+            "missing_inputs": _parse_json_list(macro_pressure_rows.iloc[0]["missing_inputs"]),
+        }
+        if not macro_pressure_rows.empty
+        else None
+    )
     breadth_health = (
         {
             "ts": breadth_rows.iloc[0]["ts"],
@@ -342,6 +381,16 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         if not liquidity_rows.empty
         else None
     )
+    predictive_snapshot = (
+        {
+            "ts": predictive_rows.iloc[0]["ts"],
+            "summary": str(predictive_rows.iloc[0]["summary"]),
+            "forward_macro_signals": _parse_metadata(predictive_rows.iloc[0]["forward_macro_signals"]),
+            "missing_inputs": _parse_json_list(predictive_rows.iloc[0]["missing_inputs"]),
+        }
+        if not predictive_rows.empty
+        else None
+    )
     cycles = [
         {
             "ts": row["ts"],
@@ -362,6 +411,8 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
     if latest_regime:
         latest_regime["regime_probabilities"] = _parse_metadata(latest_regime.get("regime_probabilities"))
         latest_regime["regime_drivers"] = _parse_metadata(latest_regime.get("regime_drivers"))
+        latest_regime["bayesian_evidence"] = _parse_metadata(latest_regime.get("bayesian_evidence"))
+        latest_regime["forward_regime_forecast"] = _parse_metadata(latest_regime.get("forward_regime_forecast"))
     scores = (
         {
             "inflation_score": int(latest_regime["inflation_score"]),
@@ -409,6 +460,8 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
             "confidence": float(row["confidence"]),
             "regime_probabilities": _parse_metadata(row.get("regime_probabilities")),
             "regime_drivers": _parse_metadata(row.get("regime_drivers")),
+            "bayesian_evidence": _parse_metadata(row.get("bayesian_evidence")),
+            "forward_regime_forecast": _parse_metadata(row.get("forward_regime_forecast")),
         }
         for _, row in score_history_rows.iterrows()
     ]
@@ -443,6 +496,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         latest_liquidity_ts=liquidity_rows["ts"].max() if not liquidity_rows.empty else None,
         latest_relationship_ts=relationship_rows["ts"].max() if not relationship_rows.empty else None,
         latest_stress_ts=stress_rows["ts"].max() if not stress_rows.empty else None,
+        latest_macro_pressure_ts=macro_pressure_rows["ts"].max() if not macro_pressure_rows.empty else None,
         latest_cycle_ts=cycle_rows["ts"].max() if not cycle_rows.empty else None,
     )
     latest_snapshot_ts = max(
@@ -455,6 +509,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
                 liquidity_rows["ts"].max() if not liquidity_rows.empty else None,
                 relationship_rows["ts"].max() if not relationship_rows.empty else None,
                 stress_rows["ts"].max() if not stress_rows.empty else None,
+                macro_pressure_rows["ts"].max() if not macro_pressure_rows.empty else None,
                 cycle_rows["ts"].max() if not cycle_rows.empty else None,
             )
             if ts is not None
@@ -474,9 +529,12 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         "regime": latest_regime,
         "factors": factors,
         "market_stress": market_stress,
+        "macro_pressure": macro_pressure,
         "cycles": cycles,
         "breadth_health": breadth_health,
         "liquidity_environment": liquidity_environment,
+        "predictive_snapshot": predictive_snapshot,
+        "forward_macro_signals": (predictive_snapshot or {}).get("forward_macro_signals", {}),
         "yield_curve": yield_curve,
         "yield_curve_state": yield_curve_state,
         "freshness": freshness,
@@ -655,6 +713,26 @@ def render_market_stress(snapshot: dict[str, Any], console: Console) -> None:
     console.print(Panel(body, title="MARKET STRESS", expand=False))
 
 
+def render_macro_pressure(snapshot: dict[str, Any], console: Console) -> None:
+    macro_pressure = snapshot["intelligence"].get("macro_pressure")
+    if not macro_pressure:
+        console.print(Panel("No macro pressure snapshot available.", title="MACRO PRESSURE INDEX", expand=False))
+        return
+    contributors = macro_pressure.get("primary_contributors", [])
+    contributor_text = (
+        f"\nPrimary contributors: {', '.join(str(item) for item in contributors)}"
+        if contributors
+        else ""
+    )
+    missing_inputs = macro_pressure.get("missing_inputs", [])
+    missing_text = f"\nMissing inputs: {', '.join(missing_inputs)}" if missing_inputs else ""
+    body = (
+        f"{macro_pressure['pressure_level']} ({float(macro_pressure['mpi_score']):.1f})"
+        f"{contributor_text}\n{macro_pressure['summary']}{missing_text}"
+    )
+    console.print(Panel(body, title="MACRO PRESSURE INDEX", expand=False))
+
+
 def render_cycle_monitor(snapshot: dict[str, Any], console: Console) -> None:
     rows = snapshot["intelligence"].get("cycle_monitor", [])
     if not rows:
@@ -678,6 +756,63 @@ def render_regime_probabilities(snapshot: dict[str, Any], console: Console) -> N
         suffix = f" | {driver_text}" if driver_text else ""
         lines.append(f"- {label}: {float(probability):.2f}%{suffix}")
     console.print(Panel("\n".join(lines), title="REGIME PROBABILITIES", expand=False))
+
+
+def render_forward_regime_forecast(snapshot: dict[str, Any], console: Console) -> None:
+    regime = snapshot.get("regime") or {}
+    forecast = regime.get("forward_regime_forecast") or {}
+    if not forecast:
+        console.print(Panel("No forward regime forecast available.", title="FORWARD REGIME FORECAST", expand=False))
+        return
+
+    lines = []
+    for horizon in ("30d", "90d", "180d"):
+        payload = forecast.get(horizon)
+        if not isinstance(payload, dict):
+            continue
+        top_regime = str(payload.get("top_regime") or "Unknown")
+        probability = payload.get("probability")
+        display_regime = top_regime.title()
+        lines.append(f"{horizon} outlook:")
+        lines.append(f"{display_regime} ({float(probability):.0f}%)" if probability is not None else display_regime)
+        lines.append("")
+
+    console.print(Panel("\n".join(lines).strip(), title="FORWARD REGIME FORECAST", expand=False))
+
+
+def render_forward_macro_signals(snapshot: dict[str, Any], console: Console) -> None:
+    predictive_snapshot = snapshot.get("predictive_snapshot") or {}
+    forward_signals = predictive_snapshot.get("forward_macro_signals") or {}
+    if not forward_signals:
+        console.print(Panel("No forward macro snapshot available.", title="FORWARD MACRO SIGNALS", expand=False))
+        return
+
+    signal_order = (
+        "yield_curve",
+        "credit_spreads",
+        "financial_conditions",
+        "real_rates",
+        "global_liquidity",
+        "manufacturing_momentum",
+        "volatility_term_structure",
+        "leadership_rotation",
+        "commodity_pressure",
+    )
+    lines = []
+    for key in signal_order:
+        payload = forward_signals.get(key)
+        if not isinstance(payload, dict):
+            continue
+        state = str(payload.get("state") or "Unavailable")
+        summary = str(payload.get("summary") or "")
+        brief_summary = summary.split(".")[0].strip()
+        suffix = f" ({brief_summary.lower()})" if brief_summary else ""
+        lines.append(f"{_titleize_signal_key(key)}: {state}{suffix}")
+
+    missing_inputs = predictive_snapshot.get("missing_inputs") or []
+    if missing_inputs:
+        lines.append(f"Missing inputs: {', '.join(missing_inputs)}")
+    console.print(Panel("\n".join(lines), title="FORWARD MACRO SIGNALS", expand=False))
 
 
 def render_breadth_health(snapshot: dict[str, Any], console: Console) -> None:
@@ -764,8 +899,11 @@ def render_dashboard(snapshot: dict[str, Any], console: Console | None = None) -
     _render_market_pulse(snapshot, console)
     _render_cosmic_state(snapshot, console)
     render_market_narrative(snapshot, console)
+    render_forward_macro_signals(snapshot, console)
     render_regime_probabilities(snapshot, console)
+    render_forward_regime_forecast(snapshot, console)
     render_market_stress(snapshot, console)
+    render_macro_pressure(snapshot, console)
     render_cycle_monitor(snapshot, console)
     render_breadth_health(snapshot, console)
     render_liquidity_environment(snapshot, console)

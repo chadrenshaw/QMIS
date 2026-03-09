@@ -25,6 +25,7 @@ TREASURY_YIELD_CSV_URL_TEMPLATE = (
 )
 TREASURY_YIELD_COLUMN_MAP = {
     "DGS10": "10 Yr",
+    "DGS2": "2 Yr",
     "DGS3MO": "3 Mo",
 }
 
@@ -35,11 +36,35 @@ MACRO_SERIES: dict[str, dict[str, str]] = {
         "unit": "percent",
         "frequency": "daily",
     },
+    "DGS2": {
+        "series_name": "yield_2y",
+        "indicator_name": "2Y Treasury Yield",
+        "unit": "percent",
+        "frequency": "daily",
+    },
     "DGS3MO": {
         "series_name": "yield_3m",
         "indicator_name": "3M Treasury Yield",
         "unit": "percent",
         "frequency": "daily",
+    },
+    "BAMLH0A0HYM2": {
+        "series_name": "high_yield_spread",
+        "indicator_name": "High Yield Spread",
+        "unit": "spread_points",
+        "frequency": "daily",
+    },
+    "BAA10YM": {
+        "series_name": "baa_corporate_spread",
+        "indicator_name": "Moody's BAA Corporate Spread",
+        "unit": "spread_points",
+        "frequency": "daily",
+    },
+    "STLFSI4": {
+        "series_name": "financial_conditions_index",
+        "indicator_name": "St. Louis Fed Financial Stress Index",
+        "unit": "index_points",
+        "frequency": "weekly",
     },
     "M2SL": {
         "series_name": "m2_money_supply",
@@ -62,6 +87,12 @@ MACRO_SERIES: dict[str, dict[str, str]] = {
     "DFII10": {
         "series_name": "real_yields",
         "indicator_name": "10Y Real Yield",
+        "unit": "percent",
+        "frequency": "daily",
+    },
+    "T10YIE": {
+        "series_name": "breakeven_inflation_10y",
+        "indicator_name": "10Y Breakeven Inflation",
         "unit": "percent",
         "frequency": "daily",
     },

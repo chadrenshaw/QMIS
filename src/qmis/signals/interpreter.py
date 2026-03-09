@@ -64,6 +64,27 @@ def build_regime_probability_summary(snapshot: dict[str, Any]) -> list[dict[str,
     ]
 
 
+def build_forward_regime_forecast_summary(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    regime = snapshot.get("regime") or {}
+    forecast = regime.get("forward_regime_forecast") or {}
+    if not isinstance(forecast, dict):
+        return []
+    rows = []
+    for horizon in ("30d", "90d", "180d"):
+        payload = forecast.get(horizon)
+        if not isinstance(payload, dict):
+            continue
+        rows.append(
+            {
+                "horizon": horizon,
+                "top_regime": str(payload.get("top_regime") or "Unknown"),
+                "probability": float(payload.get("probability") or 0.0),
+                "distribution": dict(payload.get("distribution") or {}),
+            }
+        )
+    return rows
+
+
 def _trend(snapshot: dict[str, Any], series_name: str) -> str:
     trend_label = snapshot.get("trend_summary", {}).get(series_name, {}).get("trend_label")
     return str(trend_label) if trend_label is not None else "N/A"
@@ -813,9 +834,11 @@ def build_operator_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "cosmic_state_line": build_cosmic_state_line(snapshot, world_state),
         "market_narrative": build_market_narrative(snapshot),
         "market_stress": snapshot.get("market_stress"),
+        "macro_pressure": snapshot.get("macro_pressure"),
         "breadth_health": snapshot.get("breadth_health"),
         "liquidity_environment": snapshot.get("liquidity_environment"),
         "regime_probabilities": build_regime_probability_summary(snapshot),
+        "forward_regime_forecast": build_forward_regime_forecast_summary(snapshot),
         "divergences": build_divergence_summary(snapshot),
         "market_drivers": build_market_drivers(snapshot),
         "relationship_shifts": relationship_changes,

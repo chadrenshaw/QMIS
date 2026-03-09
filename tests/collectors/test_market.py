@@ -25,7 +25,15 @@ class QMISMarketCollectorTests(unittest.TestCase):
                 ("HG=F", "Close"): [4.11, 4.13],
                 ("^GSPC", "Close"): [5099.0, 5102.5],
                 ("^VIX", "Close"): [18.4, 17.9],
+                ("^VIX3M", "Close"): [19.6, 19.1],
+                ("^VIX6M", "Close"): [20.4, 20.0],
                 ("DX-Y.NYB", "Close"): [103.2, 103.4],
+                ("SMH", "Close"): [251.2, 255.8],
+                ("IWM", "Close"): [204.4, 206.0],
+                ("KBE", "Close"): [48.2, 48.9],
+                ("IYT", "Close"): [66.5, 67.1],
+                ("DBA", "Close"): [27.2, 27.6],
+                ("DBC", "Close"): [24.1, 24.5],
             },
             index=index,
         )
@@ -37,10 +45,25 @@ class QMISMarketCollectorTests(unittest.TestCase):
 
         signals = normalize_market_signals(self._build_raw_download_frame())
 
-        self.assertEqual(len(signals), 12)
+        self.assertEqual(len(signals), 28)
         self.assertEqual(
             set(signals["series_name"]),
-            {"gold", "oil", "copper", "sp500", "vix", "dollar_index"},
+            {
+                "gold",
+                "oil",
+                "copper",
+                "sp500",
+                "vix",
+                "vix3m",
+                "vix6m",
+                "dollar_index",
+                "semiconductor_index",
+                "small_caps",
+                "bank_stocks",
+                "transportation_index",
+                "agriculture_index",
+                "commodity_index",
+            },
         )
         self.assertTrue((signals["source"] == "yfinance").all())
         self.assertTrue((signals["category"] == "market").all())
@@ -51,6 +74,10 @@ class QMISMarketCollectorTests(unittest.TestCase):
         gold_rows = signals.loc[signals["series_name"] == "gold"].sort_values("ts")
         self.assertEqual(list(gold_rows["value"]), [2050.5, 2061.25])
         self.assertIn('"ticker": "GC=F"', gold_rows.iloc[0]["metadata"])
+        volatility_rows = signals.loc[signals["series_name"] == "vix3m"].sort_values("ts")
+        self.assertEqual(list(volatility_rows["value"]), [19.6, 19.1])
+        leadership_rows = signals.loc[signals["series_name"] == "semiconductor_index"].sort_values("ts")
+        self.assertEqual(list(leadership_rows["value"]), [251.2, 255.8])
 
     def test_run_market_collector_persists_rows_into_signals_table(self) -> None:
         from qmis.collectors.market import run_market_collector
@@ -72,15 +99,37 @@ class QMISMarketCollectorTests(unittest.TestCase):
             finally:
                 connection.close()
 
-        self.assertEqual(inserted_rows, 12)
-        self.assertEqual(len(persisted), 12)
+        self.assertEqual(inserted_rows, 28)
+        self.assertEqual(len(persisted), 28)
         self.assertEqual(
             persisted.iloc[0].to_dict(),
             {
                 "source": "yfinance",
                 "category": "market",
-                "series_name": "copper",
-                "value": 4.11,
+                "series_name": "agriculture_index",
+                "value": 27.2,
+                "unit": "usd",
+            },
+        )
+        latest_vix6m = persisted.loc[persisted["series_name"] == "vix6m"].iloc[-1]
+        self.assertEqual(
+            latest_vix6m.to_dict(),
+            {
+                "source": "yfinance",
+                "category": "market",
+                "series_name": "vix6m",
+                "value": 20.0,
+                "unit": "index_points",
+            },
+        )
+        latest_transportation = persisted.loc[persisted["series_name"] == "transportation_index"].iloc[-1]
+        self.assertEqual(
+            latest_transportation.to_dict(),
+            {
+                "source": "yfinance",
+                "category": "market",
+                "series_name": "transportation_index",
+                "value": 67.1,
                 "unit": "usd",
             },
         )

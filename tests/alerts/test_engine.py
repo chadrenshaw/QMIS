@@ -43,6 +43,8 @@ class QMISAlertEngineTests(unittest.TestCase):
                     "confidence": 0.74,
                     "regime_probabilities": '{"INFLATIONARY EXPANSION": 58.0, "LIQUIDITY EXPANSION": 22.0, "NEUTRAL": 20.0}',
                     "regime_drivers": '{"INFLATIONARY EXPANSION": ["growth and inflation both firm"]}',
+                    "bayesian_evidence": '{"LIQUIDITY EXPANSION": ["liquidity expansion"]}',
+                    "forward_regime_forecast": '{"30d": {"horizon_days": 30, "top_regime": "LIQUIDITY EXPANSION", "probability": 40.0, "distribution": {"LIQUIDITY EXPANSION": 40.0, "LIQUIDITY WITHDRAWAL": 12.0, "RECESSION RISK": 10.0, "STAGFLATION RISK": 10.0, "DISINFLATION": 16.0, "NEUTRAL": 12.0}}}',
                 },
                 {
                     "ts": ts,
@@ -54,6 +56,8 @@ class QMISAlertEngineTests(unittest.TestCase):
                     "confidence": 0.9,
                     "regime_probabilities": '{"CRISIS / RISK-OFF": 47.0, "RECESSION RISK": 26.0, "LIQUIDITY WITHDRAWAL": 17.0, "NEUTRAL": 10.0}',
                     "regime_drivers": '{"CRISIS / RISK-OFF": ["risk elevated", "growth deteriorating"]}',
+                    "bayesian_evidence": '{"RECESSION RISK": ["yield curve inversion"], "LIQUIDITY WITHDRAWAL": ["liquidity tightening"]}',
+                    "forward_regime_forecast": '{"30d": {"horizon_days": 30, "top_regime": "RECESSION RISK", "probability": 38.0, "distribution": {"LIQUIDITY EXPANSION": 8.0, "LIQUIDITY WITHDRAWAL": 26.0, "RECESSION RISK": 38.0, "STAGFLATION RISK": 12.0, "DISINFLATION": 4.0, "NEUTRAL": 12.0}}}',
                 },
             ]
         )
@@ -94,12 +98,26 @@ class QMISAlertEngineTests(unittest.TestCase):
                 },
             ]
         )
+        macro_pressure = pd.DataFrame(
+            [
+                {
+                    "ts": ts,
+                    "mpi_score": 88.0,
+                    "pressure_level": "CRISIS CONDITIONS",
+                    "summary": "Macro pressure is crisis conditions led by volatility regime, breadth deterioration, credit spread widening.",
+                    "components": '{"credit_stress": {"score": 91.0}, "volatility_stress": {"score": 86.0}}',
+                    "primary_contributors": '["volatility regime", "breadth deterioration", "credit spread widening"]',
+                    "missing_inputs": "[]",
+                }
+            ]
+        )
 
         with connect_db(db_path) as connection:
             for table_name, payload in (
                 ("signals", signals),
                 ("regimes", regimes),
                 ("relationships", relationships),
+                ("macro_pressure_snapshots", macro_pressure),
             ):
                 connection.register(f"{table_name}_df", payload)
                 connection.execute(f"INSERT INTO {table_name} SELECT * FROM {table_name}_df")
@@ -130,6 +148,8 @@ class QMISAlertEngineTests(unittest.TestCase):
         self.assertGreaterEqual(first_count, 5)
         self.assertEqual(len({row[1] for row in rows}), len(rows))
         self.assertIn(("threshold", "threshold:vix_stress", "critical", "Threshold breached"), rows)
+        self.assertIn(("macro_pressure", "macro_pressure:high", "warning", "Macro stress alert"), rows)
+        self.assertIn(("macro_pressure", "macro_pressure:crisis", "critical", "Systemic crisis alert"), rows)
 
 
 if __name__ == "__main__":

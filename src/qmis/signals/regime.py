@@ -8,7 +8,13 @@ from typing import Any
 
 import pandas as pd
 
+from qmis.models.bayesian_regime import (
+    build_forward_regime_forecast,
+    update_regime_probabilities,
+)
 from qmis.schema import bootstrap_database
+from qmis.signals.macro_pressure import materialize_macro_pressure
+from qmis.signals.predictive import materialize_predictive_signals
 from qmis.signals.scoring import compute_macro_scores
 from qmis.storage import connect_db, get_default_db_path
 
@@ -143,120 +149,32 @@ def build_regime_probabilities(
     breadth_health: dict[str, Any] | None = None,
     liquidity_environment: dict[str, Any] | None = None,
     market_stress: dict[str, Any] | None = None,
+    macro_pressure: dict[str, Any] | None = None,
     factors: list[dict[str, Any]] | None = None,
+    predictive_snapshot: dict[str, Any] | None = None,
     headline_regime: str | None = None,
 ) -> tuple[dict[str, float], dict[str, list[str]]]:
-    """Build a normalized probability distribution across supported regimes."""
-    inflation_score = int(scores["inflation_score"])
-    growth_score = int(scores["growth_score"])
-    liquidity_score = int(scores["liquidity_score"])
-    risk_score = int(scores["risk_score"])
-
-    breadth_state = str((breadth_health or {}).get("breadth_state", "")).upper()
-    liquidity_state = str((liquidity_environment or {}).get("liquidity_state", "")).upper()
-    stress_level = str((market_stress or {}).get("stress_level", "")).upper()
-
-    factors = list(factors or [])
-    liquidity_factor = next((factor for factor in factors if str(factor.get("factor_name")) == "liquidity"), None)
-    volatility_factor = next((factor for factor in factors if str(factor.get("factor_name")) == "volatility"), None)
-    crypto_factor = next((factor for factor in factors if str(factor.get("factor_name")) == "crypto"), None)
-
-    raw_scores = {label: 0.2 for label in SUPPORTED_REGIMES}
-    drivers = {label: [] for label in SUPPORTED_REGIMES}
-
-    raw_scores["CRISIS / RISK-OFF"] += risk_score * 1.2
-    if stress_level in {"HIGH", "CRITICAL"}:
-        raw_scores["CRISIS / RISK-OFF"] += 1.1
-        drivers["CRISIS / RISK-OFF"].append(f"market stress {stress_level.lower()}")
-    if breadth_state == "FRAGILE":
-        raw_scores["CRISIS / RISK-OFF"] += 0.9
-        drivers["CRISIS / RISK-OFF"].append("fragile breadth")
-    if volatility_factor and str(volatility_factor.get("direction", "")).lower() == "stressed":
-        raw_scores["CRISIS / RISK-OFF"] += 0.8
-        drivers["CRISIS / RISK-OFF"].append("stressed volatility factor")
-
-    raw_scores["INFLATIONARY EXPANSION"] += inflation_score * 0.8 + growth_score * 0.8 + liquidity_score * 0.7
-    if breadth_state == "STRONG":
-        raw_scores["INFLATIONARY EXPANSION"] += 0.7
-        drivers["INFLATIONARY EXPANSION"].append("strong breadth")
-    if liquidity_state == "EXPANDING":
-        raw_scores["INFLATIONARY EXPANSION"] += 0.7
-        drivers["INFLATIONARY EXPANSION"].append("expanding liquidity")
-    raw_scores["INFLATIONARY EXPANSION"] -= risk_score * 0.4
-
-    raw_scores["DISINFLATION"] += max(0, 2 - inflation_score) * 1.1 + growth_score * 0.5 + liquidity_score * 0.4
-    if inflation_score <= 1:
-        drivers["DISINFLATION"].append("contained inflation")
-    raw_scores["DISINFLATION"] -= risk_score * 0.3
-
-    raw_scores["RECESSION RISK"] += max(0, 2 - growth_score) * 1.3 + risk_score * 1.0
-    if breadth_state in {"WEAKENING", "FRAGILE"}:
-        raw_scores["RECESSION RISK"] += 0.8
-        drivers["RECESSION RISK"].append(f"{breadth_state.lower()} breadth")
-    if liquidity_state == "TIGHTENING":
-        raw_scores["RECESSION RISK"] += 0.8
-        drivers["RECESSION RISK"].append("tightening liquidity")
-    if stress_level in {"HIGH", "CRITICAL"}:
-        raw_scores["RECESSION RISK"] += 0.7
-        drivers["RECESSION RISK"].append("elevated stress")
-
-    raw_scores["LIQUIDITY EXPANSION"] += liquidity_score * 0.9
-    if liquidity_state == "EXPANDING":
-        raw_scores["LIQUIDITY EXPANSION"] += 1.2
-        drivers["LIQUIDITY EXPANSION"].append("liquidity composite expanding")
-    if liquidity_factor and str(liquidity_factor.get("direction", "")).lower() == "expanding":
-        raw_scores["LIQUIDITY EXPANSION"] += float(liquidity_factor.get("strength", 0.0))
-        drivers["LIQUIDITY EXPANSION"].append("expanding liquidity factor")
-    raw_scores["LIQUIDITY EXPANSION"] -= risk_score * 0.3
-
-    raw_scores["LIQUIDITY WITHDRAWAL"] += max(0, 2 - liquidity_score) * 1.1 + risk_score * 0.4
-    if liquidity_state == "TIGHTENING":
-        raw_scores["LIQUIDITY WITHDRAWAL"] += 1.3
-        drivers["LIQUIDITY WITHDRAWAL"].append("liquidity composite tightening")
-    if liquidity_factor and str(liquidity_factor.get("direction", "")).lower() == "tightening":
-        raw_scores["LIQUIDITY WITHDRAWAL"] += float(liquidity_factor.get("strength", 0.0))
-        drivers["LIQUIDITY WITHDRAWAL"].append("tightening liquidity factor")
-
-    raw_scores["SPECULATIVE BUBBLE"] += growth_score * 1.0 + liquidity_score * 0.8 + max(0, 1 - risk_score) * 0.9
-    if breadth_state == "STRONG":
-        raw_scores["SPECULATIVE BUBBLE"] += 0.8
-        drivers["SPECULATIVE BUBBLE"].append("strong breadth participation")
-    if liquidity_state == "EXPANDING":
-        raw_scores["SPECULATIVE BUBBLE"] += 0.9
-        drivers["SPECULATIVE BUBBLE"].append("easy liquidity conditions")
-    if crypto_factor and str(crypto_factor.get("direction", "")).lower() == "bullish":
-        raw_scores["SPECULATIVE BUBBLE"] += 0.5
-        drivers["SPECULATIVE BUBBLE"].append("bullish crypto factor")
-
-    raw_scores["NEUTRAL"] += 1.0
-    if breadth_state == "WEAKENING":
-        raw_scores["NEUTRAL"] += 0.4
-        drivers["NEUTRAL"].append("mixed breadth")
-    if liquidity_state == "NEUTRAL":
-        raw_scores["NEUTRAL"] += 0.4
-        drivers["NEUTRAL"].append("neutral liquidity")
-    if stress_level in {"LOW", "MODERATE"}:
-        raw_scores["NEUTRAL"] += 0.2
-
-    raw_scores["STAGFLATION RISK"] += inflation_score * 1.0 + max(0, 2 - growth_score) * 1.0 + risk_score * 0.7
-    if liquidity_state == "TIGHTENING":
-        raw_scores["STAGFLATION RISK"] += 0.6
-        drivers["STAGFLATION RISK"].append("tight liquidity backdrop")
-    if inflation_score >= 2:
-        drivers["STAGFLATION RISK"].append("inflation remains elevated")
-
-    if headline_regime:
-        raw_scores[headline_regime] = raw_scores.get(headline_regime, 0.2) + 0.75
-        drivers.setdefault(headline_regime, []).append("headline rule match")
-
-    probabilities = _normalize_probabilities(raw_scores)
-    drivers = {label: reasons for label, reasons in drivers.items() if reasons}
-    return probabilities, drivers
+    """Build Bayesian posterior regime probabilities from the latest signal stack."""
+    del factors
+    del headline_regime
+    posterior, evidence = update_regime_probabilities(
+        {
+            "scores": scores,
+            "breadth_health": breadth_health,
+            "liquidity_environment": liquidity_environment,
+            "market_stress": market_stress,
+            "macro_pressure": macro_pressure,
+            "predictive_snapshot": predictive_snapshot,
+        }
+    )
+    return posterior, evidence
 
 
 def materialize_regime(db_path: Path | None = None) -> int:
     """Recompute and replace the current macro regime snapshot."""
     target_path = bootstrap_database(db_path or get_default_db_path())
+    materialize_predictive_signals(db_path=target_path)
+    materialize_macro_pressure(db_path=target_path)
     with connect_db(target_path) as connection:
         feature_snapshot = _build_latest_feature_snapshot(connection)
         connection.execute("DELETE FROM regimes")
@@ -290,9 +208,20 @@ def materialize_regime(db_path: Path | None = None) -> int:
                 "stress_snapshots",
                 "ts, stress_score, stress_level, summary, components, missing_inputs",
             ),
+            macro_pressure=_load_latest_snapshot(
+                connection,
+                "macro_pressure_snapshots",
+                "ts, mpi_score, pressure_level, summary, components, primary_contributors, missing_inputs",
+            ),
             factors=_load_factors(connection),
+            predictive_snapshot=_load_latest_snapshot(
+                connection,
+                "predictive_snapshots",
+                "ts, summary, forward_macro_signals, missing_inputs",
+            ),
             headline_regime=regime_label,
         )
+        forward_regime_forecast = build_forward_regime_forecast(regime_probabilities)
         confidence = max(regime_probabilities.values()) / 100.0 if regime_probabilities else 0.0
 
         payload = pd.DataFrame(
@@ -307,6 +236,8 @@ def materialize_regime(db_path: Path | None = None) -> int:
                     "confidence": float(confidence),
                     "regime_probabilities": json.dumps(regime_probabilities, sort_keys=True),
                     "regime_drivers": json.dumps(regime_drivers, sort_keys=True),
+                    "bayesian_evidence": json.dumps(regime_drivers, sort_keys=True),
+                    "forward_regime_forecast": json.dumps(forward_regime_forecast, sort_keys=True),
                 }
             ]
         )
@@ -323,7 +254,9 @@ def materialize_regime(db_path: Path | None = None) -> int:
                 regime_label,
                 confidence,
                 regime_probabilities,
-                regime_drivers
+                regime_drivers,
+                bayesian_evidence,
+                forward_regime_forecast
             )
             SELECT
                 ts,
@@ -334,7 +267,9 @@ def materialize_regime(db_path: Path | None = None) -> int:
                 regime_label,
                 confidence,
                 regime_probabilities,
-                regime_drivers
+                regime_drivers,
+                bayesian_evidence,
+                forward_regime_forecast
             FROM regimes_df
             """
         )

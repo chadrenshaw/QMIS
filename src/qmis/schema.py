@@ -80,12 +80,31 @@ SCHEMA_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS macro_pressure_snapshots (
+        ts TIMESTAMP,
+        mpi_score DOUBLE,
+        pressure_level TEXT,
+        summary TEXT,
+        components JSON,
+        primary_contributors JSON,
+        missing_inputs JSON
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS liquidity_snapshots (
         ts TIMESTAMP,
         liquidity_score DOUBLE,
         liquidity_state TEXT,
         summary TEXT,
         components JSON,
+        missing_inputs JSON
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS predictive_snapshots (
+        ts TIMESTAMP,
+        summary TEXT,
+        forward_macro_signals JSON,
         missing_inputs JSON
     )
     """,
@@ -112,7 +131,9 @@ SCHEMA_STATEMENTS = (
         regime_label TEXT,
         confidence DOUBLE,
         regime_probabilities JSON,
-        regime_drivers JSON
+        regime_drivers JSON,
+        bayesian_evidence JSON,
+        forward_regime_forecast JSON
     )
     """,
     """
@@ -154,8 +175,19 @@ SCHEMA_MIGRATIONS = (
     "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS series_x TEXT",
     "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS series_y TEXT",
     "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS metadata JSON",
+    "ALTER TABLE predictive_snapshots ADD COLUMN IF NOT EXISTS summary TEXT",
+    "ALTER TABLE predictive_snapshots ADD COLUMN IF NOT EXISTS forward_macro_signals JSON",
+    "ALTER TABLE predictive_snapshots ADD COLUMN IF NOT EXISTS missing_inputs JSON",
+    "ALTER TABLE macro_pressure_snapshots ADD COLUMN IF NOT EXISTS mpi_score DOUBLE",
+    "ALTER TABLE macro_pressure_snapshots ADD COLUMN IF NOT EXISTS pressure_level TEXT",
+    "ALTER TABLE macro_pressure_snapshots ADD COLUMN IF NOT EXISTS summary TEXT",
+    "ALTER TABLE macro_pressure_snapshots ADD COLUMN IF NOT EXISTS components JSON",
+    "ALTER TABLE macro_pressure_snapshots ADD COLUMN IF NOT EXISTS primary_contributors JSON",
+    "ALTER TABLE macro_pressure_snapshots ADD COLUMN IF NOT EXISTS missing_inputs JSON",
     "ALTER TABLE regimes ADD COLUMN IF NOT EXISTS regime_probabilities JSON",
     "ALTER TABLE regimes ADD COLUMN IF NOT EXISTS regime_drivers JSON",
+    "ALTER TABLE regimes ADD COLUMN IF NOT EXISTS bayesian_evidence JSON",
+    "ALTER TABLE regimes ADD COLUMN IF NOT EXISTS forward_regime_forecast JSON",
 )
 
 

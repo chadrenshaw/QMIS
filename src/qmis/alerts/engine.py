@@ -58,6 +58,29 @@ def _latest_signals(connection) -> dict[str, dict[str, Any]]:
     }
 
 
+def _latest_macro_pressure(connection) -> dict[str, Any] | None:
+    rows = connection.execute(
+        """
+        SELECT ts, mpi_score, pressure_level, summary, primary_contributors
+        FROM macro_pressure_snapshots
+        ORDER BY ts DESC
+        LIMIT 1
+        """
+    ).fetchdf()
+    if rows.empty:
+        return None
+    row = rows.iloc[0].to_dict()
+    primary_contributors = row.get("primary_contributors")
+    if isinstance(primary_contributors, str):
+        import json
+
+        try:
+            row["primary_contributors"] = json.loads(primary_contributors)
+        except json.JSONDecodeError:
+            row["primary_contributors"] = []
+    return row
+
+
 def load_alert_snapshot(db_path: Path | None = None) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Load the persisted alert snapshot and a summary view."""
     target_path = bootstrap_database(db_path or get_default_db_path())
@@ -123,6 +146,7 @@ def materialize_alerts(db_path: Path | None = None) -> int:
     with connect_db(target_path) as connection:
         latest_regime, previous_regime = _latest_regime_rows(connection)
         latest_signals = _latest_signals(connection)
+        macro_pressure = _latest_macro_pressure(connection)
         relationships = connection.execute(
             """
             SELECT
@@ -165,6 +189,7 @@ def materialize_alerts(db_path: Path | None = None) -> int:
             relationships=relationships,
             anomalies=anomalies,
             cycles=cycles,
+            macro_pressure=macro_pressure,
         )
 
         connection.execute("DELETE FROM alerts")

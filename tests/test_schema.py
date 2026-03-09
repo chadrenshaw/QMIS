@@ -38,7 +38,9 @@ class QMISSchemaTests(unittest.TestCase):
                 "features",
                 "breadth_snapshots",
                 "cycle_snapshots",
+                "macro_pressure_snapshots",
                 "liquidity_snapshots",
+                "predictive_snapshots",
                 "regimes",
                 "relationships",
                 "signals",
@@ -79,9 +81,17 @@ class QMISSchemaTests(unittest.TestCase):
                     row[1]
                     for row in connection.execute("PRAGMA table_info('cycle_snapshots')").fetchall()
                 }
+                macro_pressure_columns = {
+                    row[1]
+                    for row in connection.execute("PRAGMA table_info('macro_pressure_snapshots')").fetchall()
+                }
                 liquidity_columns = {
                     row[1]
                     for row in connection.execute("PRAGMA table_info('liquidity_snapshots')").fetchall()
+                }
+                predictive_columns = {
+                    row[1]
+                    for row in connection.execute("PRAGMA table_info('predictive_snapshots')").fetchall()
                 }
                 relationships_columns = {
                     row[1]
@@ -172,6 +182,18 @@ class QMISSchemaTests(unittest.TestCase):
             },
         )
         self.assertEqual(
+            macro_pressure_columns,
+            {
+                "ts",
+                "mpi_score",
+                "pressure_level",
+                "summary",
+                "components",
+                "primary_contributors",
+                "missing_inputs",
+            },
+        )
+        self.assertEqual(
             liquidity_columns,
             {
                 "ts",
@@ -179,6 +201,15 @@ class QMISSchemaTests(unittest.TestCase):
                 "liquidity_state",
                 "summary",
                 "components",
+                "missing_inputs",
+            },
+        )
+        self.assertEqual(
+            predictive_columns,
+            {
+                "ts",
+                "summary",
+                "forward_macro_signals",
                 "missing_inputs",
             },
         )
@@ -208,6 +239,8 @@ class QMISSchemaTests(unittest.TestCase):
                 "confidence",
                 "regime_probabilities",
                 "regime_drivers",
+                "bayesian_evidence",
+                "forward_regime_forecast",
             },
         )
         self.assertEqual(

@@ -173,6 +173,8 @@ class QMISRegimeTests(unittest.TestCase):
             connection = duckdb.connect(str(db_path), read_only=True)
             try:
                 persisted = connection.execute("SELECT * FROM regimes").fetchdf()
+                predictive_persisted = connection.execute("SELECT * FROM predictive_snapshots").fetchdf()
+                macro_pressure_persisted = connection.execute("SELECT * FROM macro_pressure_snapshots").fetchdf()
             finally:
                 connection.close()
 
@@ -187,11 +189,21 @@ class QMISRegimeTests(unittest.TestCase):
         self.assertGreaterEqual(row["confidence"], 0.0)
         self.assertLessEqual(row["confidence"], 1.0)
         probabilities = json.loads(row["regime_probabilities"])
-        self.assertIn("SPECULATIVE BUBBLE", probabilities)
+        self.assertIn("LIQUIDITY EXPANSION", probabilities)
         self.assertAlmostEqual(sum(probabilities.values()), 100.0, places=2)
         drivers = json.loads(row["regime_drivers"])
-        self.assertIn("SPECULATIVE BUBBLE", drivers)
-        self.assertTrue(drivers["SPECULATIVE BUBBLE"])
+        self.assertIn("LIQUIDITY EXPANSION", drivers)
+        self.assertTrue(drivers["LIQUIDITY EXPANSION"])
+        bayesian_evidence = json.loads(row["bayesian_evidence"])
+        self.assertIn("LIQUIDITY EXPANSION", bayesian_evidence)
+        forecast = json.loads(row["forward_regime_forecast"])
+        self.assertEqual(set(forecast), {"30d", "90d", "180d"})
+        self.assertIn("top_regime", forecast["30d"])
+        self.assertIn("distribution", forecast["90d"])
+        self.assertEqual(len(predictive_persisted), 1)
+        self.assertEqual(len(macro_pressure_persisted), 1)
+        forward_signals = json.loads(predictive_persisted.iloc[0]["forward_macro_signals"])
+        self.assertEqual(forward_signals["yield_curve"]["state"], "Normal")
 
     def test_build_regime_probabilities_handles_mixed_signals(self) -> None:
         from qmis.signals.regime import build_regime_probabilities
@@ -215,9 +227,42 @@ class QMISRegimeTests(unittest.TestCase):
         self.assertAlmostEqual(sum(probabilities.values()), 100.0, places=2)
         self.assertGreater(probabilities["RECESSION RISK"], 0.0)
         self.assertGreater(probabilities["LIQUIDITY WITHDRAWAL"], 0.0)
-        self.assertGreater(probabilities["CRISIS / RISK-OFF"], 0.0)
-        self.assertLess(probabilities["SPECULATIVE BUBBLE"], probabilities["RECESSION RISK"])
+        self.assertGreater(probabilities["STAGFLATION RISK"], 0.0)
+        self.assertLess(probabilities["LIQUIDITY EXPANSION"], probabilities["RECESSION RISK"])
         self.assertTrue(drivers["RECESSION RISK"])
+
+    def test_build_regime_probabilities_uses_predictive_macro_evidence(self) -> None:
+        from qmis.signals.regime import build_regime_probabilities
+
+        probabilities, drivers = build_regime_probabilities(
+            scores={
+                "inflation_score": 1,
+                "growth_score": 2,
+                "liquidity_score": 2,
+                "risk_score": 1,
+            },
+            breadth_health={"breadth_state": "STRONG", "breadth_score": 68.0},
+            liquidity_environment={"liquidity_state": "NEUTRAL", "liquidity_score": 50.0},
+            market_stress={"stress_level": "MODERATE", "stress_score": 44.0},
+            predictive_snapshot={
+                "forward_macro_signals": {
+                    "yield_curve": {"state": "Inverted", "summary": "Yield curve remains inverted."},
+                    "credit_spreads": {"state": "Widening", "summary": "Credit spreads are widening."},
+                    "financial_conditions": {"state": "Tightening", "summary": "Conditions are tightening."},
+                    "real_rates": {"state": "Rising", "summary": "Real rates are rising."},
+                    "global_liquidity": {"state": "Contracting", "summary": "Liquidity is contracting."},
+                    "volatility_term_structure": {"state": "Backwardation", "summary": "Volatility curve is backwardated."},
+                    "manufacturing_momentum": {"state": "Weakening", "summary": "Manufacturing is weakening."},
+                    "leadership_rotation": {"state": "Defensive", "summary": "Leadership is defensive."},
+                    "commodity_pressure": {"state": "Inflationary", "summary": "Commodity pressure is inflationary."},
+                }
+            },
+        )
+
+        self.assertGreater(probabilities["RECESSION RISK"], probabilities["LIQUIDITY EXPANSION"])
+        self.assertGreater(probabilities["LIQUIDITY WITHDRAWAL"], probabilities["NEUTRAL"])
+        self.assertIn("yield curve inversion", " ".join(drivers["RECESSION RISK"]))
+        self.assertIn("global liquidity contracting", " ".join(drivers["LIQUIDITY WITHDRAWAL"]))
 
 
 if __name__ == "__main__":

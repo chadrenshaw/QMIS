@@ -70,6 +70,8 @@ class QMISAPITests(unittest.TestCase):
                     "confidence": 0.76,
                     "regime_probabilities": '{"INFLATIONARY EXPANSION": 52.0, "DISINFLATION": 18.0, "NEUTRAL": 30.0}',
                     "regime_drivers": '{"INFLATIONARY EXPANSION": ["positive growth and liquidity"]}',
+                    "bayesian_evidence": '{"INFLATIONARY EXPANSION": ["liquidity expansion"]}',
+                    "forward_regime_forecast": '{"30d": {"horizon_days": 30, "top_regime": "INFLATIONARY EXPANSION", "probability": 44.0, "distribution": {"LIQUIDITY EXPANSION": 26.0, "LIQUIDITY WITHDRAWAL": 8.0, "RECESSION RISK": 6.0, "STAGFLATION RISK": 10.0, "DISINFLATION": 20.0, "NEUTRAL": 30.0}}}',
                 },
                 {
                     "ts": ts,
@@ -81,6 +83,8 @@ class QMISAPITests(unittest.TestCase):
                     "confidence": 0.82,
                     "regime_probabilities": '{"LIQUIDITY WITHDRAWAL": 29.0, "RECESSION RISK": 25.0, "INFLATIONARY EXPANSION": 18.0, "CRISIS / RISK-OFF": 12.0, "NEUTRAL": 16.0}',
                     "regime_drivers": '{"LIQUIDITY WITHDRAWAL": ["liquidity tightening", "risk elevated"]}',
+                    "bayesian_evidence": '{"LIQUIDITY WITHDRAWAL": ["liquidity tightening", "global liquidity contracting"], "RECESSION RISK": ["yield curve inversion", "credit spreads widening"]}',
+                    "forward_regime_forecast": '{"30d": {"horizon_days": 30, "top_regime": "LIQUIDITY WITHDRAWAL", "probability": 41.0, "distribution": {"LIQUIDITY EXPANSION": 10.0, "LIQUIDITY WITHDRAWAL": 41.0, "RECESSION RISK": 27.0, "STAGFLATION RISK": 10.0, "DISINFLATION": 4.0, "NEUTRAL": 8.0}}, "90d": {"horizon_days": 90, "top_regime": "RECESSION RISK", "probability": 36.0, "distribution": {"LIQUIDITY EXPANSION": 16.0, "LIQUIDITY WITHDRAWAL": 21.0, "RECESSION RISK": 36.0, "STAGFLATION RISK": 11.0, "DISINFLATION": 8.0, "NEUTRAL": 8.0}}, "180d": {"horizon_days": 180, "top_regime": "LIQUIDITY EXPANSION", "probability": 29.0, "distribution": {"LIQUIDITY EXPANSION": 29.0, "LIQUIDITY WITHDRAWAL": 17.0, "RECESSION RISK": 24.0, "STAGFLATION RISK": 9.0, "DISINFLATION": 12.0, "NEUTRAL": 9.0}}}',
                 }
             ]
         )
@@ -249,6 +253,8 @@ class QMISAPITests(unittest.TestCase):
         self.assertEqual(regime.status_code, 200)
         self.assertEqual(regime.json()["regime_label"], "STAGFLATION RISK")
         self.assertEqual(regime.json()["regime_probabilities"]["LIQUIDITY WITHDRAWAL"], 29.0)
+        self.assertEqual(regime.json()["forward_regime_forecast"]["90d"]["top_regime"], "RECESSION RISK")
+        self.assertEqual(regime.json()["bayesian_evidence"]["LIQUIDITY WITHDRAWAL"][0], "liquidity tightening")
 
         self.assertEqual(signals.status_code, 200)
         self.assertIn("gold", signals.json()["signals"])
@@ -276,6 +282,8 @@ class QMISAPITests(unittest.TestCase):
         self.assertEqual(len(dashboard.json()["signal_history"]["gold"]), 2)
         self.assertEqual(len(dashboard.json()["score_history"]), 2)
         self.assertEqual(dashboard.json()["regime"]["regime_probabilities"]["LIQUIDITY WITHDRAWAL"], 29.0)
+        self.assertEqual(dashboard.json()["regime"]["forward_regime_forecast"]["180d"]["top_regime"], "LIQUIDITY EXPANSION")
+        self.assertEqual(dashboard.json()["regime"]["bayesian_evidence"]["RECESSION RISK"][0], "yield curve inversion")
         self.assertEqual(dashboard.json()["alert_summary"]["status"], "active")
         self.assertGreaterEqual(len(dashboard.json()["alerts"]), 3)
         self.assertEqual(dashboard.json()["market_stress"]["stress_level"], "HIGH")

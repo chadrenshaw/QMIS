@@ -124,6 +124,60 @@ def build_threshold_alerts(latest_signals: dict[str, dict[str, Any]]) -> list[di
     return alerts
 
 
+def build_macro_pressure_alerts(macro_pressure: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not macro_pressure:
+        return []
+    score = macro_pressure.get("mpi_score")
+    if score is None:
+        return []
+
+    mpi_score = float(score)
+    ts = macro_pressure.get("ts")
+    pressure_level = str(macro_pressure.get("pressure_level") or "")
+    contributors = list(macro_pressure.get("primary_contributors") or [])
+
+    alerts: list[dict[str, Any]] = []
+    if mpi_score > 70.0:
+        alerts.append(
+            _record(
+                ts=ts,
+                alert_type="macro_pressure",
+                severity="warning",
+                rule_key="macro_pressure_high",
+                dedupe_key="macro_pressure:high",
+                title="Macro stress alert",
+                message=f"MPI reached {mpi_score:.1f} ({pressure_level.lower()}).",
+                source_table="macro_pressure_snapshots",
+                series_name="macro_pressure_index",
+                metadata={
+                    "mpi_score": mpi_score,
+                    "pressure_level": pressure_level,
+                    "primary_contributors": contributors,
+                },
+            )
+        )
+    if mpi_score > 85.0:
+        alerts.append(
+            _record(
+                ts=ts,
+                alert_type="macro_pressure",
+                severity="critical",
+                rule_key="macro_pressure_crisis",
+                dedupe_key="macro_pressure:crisis",
+                title="Systemic crisis alert",
+                message=f"MPI reached {mpi_score:.1f}, signaling crisis conditions.",
+                source_table="macro_pressure_snapshots",
+                series_name="macro_pressure_index",
+                metadata={
+                    "mpi_score": mpi_score,
+                    "pressure_level": pressure_level,
+                    "primary_contributors": contributors,
+                },
+            )
+        )
+    return alerts
+
+
 def build_correlation_alerts(relationships: pd.DataFrame) -> list[dict[str, Any]]:
     if relationships.empty:
         return []
@@ -246,11 +300,13 @@ def evaluate_alert_rules(
     relationships: pd.DataFrame,
     anomalies: pd.DataFrame,
     cycles: pd.DataFrame,
+    macro_pressure: dict[str, Any] | None = None,
 ) -> pd.DataFrame:
     """Evaluate the full alert rule catalog and return deduplicated rows."""
     rows: list[dict[str, Any]] = []
     rows.extend(build_regime_change_alert(latest_regime, previous_regime))
     rows.extend(build_threshold_alerts(latest_signals))
+    rows.extend(build_macro_pressure_alerts(macro_pressure))
     rows.extend(build_correlation_alerts(relationships))
     rows.extend(build_relationship_break_alerts(anomalies))
     rows.extend(build_cycle_alerts(cycles))

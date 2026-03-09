@@ -216,6 +216,47 @@ class OperatorInterpreterTests(unittest.TestCase):
                     "LIQUIDITY WITHDRAWAL": ["tightening liquidity", "weak growth"],
                     "RECESSION RISK": ["soft PMI", "fragile breadth"],
                 },
+                "forward_regime_forecast": {
+                    "30d": {
+                        "horizon_days": 30,
+                        "top_regime": "LIQUIDITY WITHDRAWAL",
+                        "probability": 41.0,
+                        "distribution": {
+                            "LIQUIDITY EXPANSION": 10.0,
+                            "LIQUIDITY WITHDRAWAL": 41.0,
+                            "RECESSION RISK": 27.0,
+                            "STAGFLATION RISK": 10.0,
+                            "DISINFLATION": 4.0,
+                            "NEUTRAL": 8.0,
+                        },
+                    },
+                    "90d": {
+                        "horizon_days": 90,
+                        "top_regime": "RECESSION RISK",
+                        "probability": 36.0,
+                        "distribution": {
+                            "LIQUIDITY EXPANSION": 16.0,
+                            "LIQUIDITY WITHDRAWAL": 21.0,
+                            "RECESSION RISK": 36.0,
+                            "STAGFLATION RISK": 11.0,
+                            "DISINFLATION": 8.0,
+                            "NEUTRAL": 8.0,
+                        },
+                    },
+                    "180d": {
+                        "horizon_days": 180,
+                        "top_regime": "LIQUIDITY EXPANSION",
+                        "probability": 29.0,
+                        "distribution": {
+                            "LIQUIDITY EXPANSION": 29.0,
+                            "LIQUIDITY WITHDRAWAL": 17.0,
+                            "RECESSION RISK": 24.0,
+                            "STAGFLATION RISK": 9.0,
+                            "DISINFLATION": 12.0,
+                            "NEUTRAL": 9.0,
+                        },
+                    },
+                },
             },
             "yield_curve": 0.43,
             "yield_curve_state": "NORMAL",
@@ -456,6 +497,8 @@ class OperatorInterpreterTests(unittest.TestCase):
         self.assertEqual(intelligence["cycle_monitor"][0]["label"], "Solar Cycle Phase")
         self.assertEqual(intelligence["cycle_monitor"][0]["phase"], "Peak")
         self.assertEqual(intelligence["regime_probabilities"][0]["label"], "LIQUIDITY WITHDRAWAL")
+        self.assertEqual(intelligence["forward_regime_forecast"][0]["horizon"], "30d")
+        self.assertEqual(intelligence["forward_regime_forecast"][1]["top_regime"], "RECESSION RISK")
         self.assertIn("breadth", intelligence["market_stress"]["summary"].lower())
         self.assertTrue(intelligence["experimental_signals"]["visible"])
         self.assertEqual(intelligence["divergences"][0]["title"], "Crypto Decoupling From Liquidity")

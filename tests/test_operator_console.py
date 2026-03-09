@@ -75,6 +75,7 @@ class QMISOperatorConsoleTests(unittest.TestCase):
             factors = stack.enter_context(mock.patch.object(run_operator_console, "materialize_factors", return_value=3))
             relationships = stack.enter_context(mock.patch.object(run_operator_console, "materialize_relationships", return_value=5))
             stress = stack.enter_context(mock.patch.object(run_operator_console, "materialize_market_stress", return_value=1))
+            macro_pressure = stack.enter_context(mock.patch.object(run_operator_console, "materialize_macro_pressure", return_value=1))
             cycles = stack.enter_context(mock.patch.object(run_operator_console, "materialize_cycle_snapshots", return_value=3))
             lead_lag = stack.enter_context(mock.patch.object(run_operator_console, "materialize_lead_lag_relationships", return_value=2))
             alerts = stack.enter_context(mock.patch.object(run_operator_console, "materialize_alerts", return_value=3))
@@ -100,6 +101,7 @@ class QMISOperatorConsoleTests(unittest.TestCase):
             factors,
             relationships,
             stress,
+            macro_pressure,
             cycles,
             lead_lag,
             alerts,
@@ -204,6 +206,7 @@ class QMISOperatorConsoleTests(unittest.TestCase):
             stack.enter_context(mock.patch.object(run_operator_console, "materialize_factors", return_value=4))
             stack.enter_context(mock.patch.object(run_operator_console, "materialize_relationships", return_value=5))
             stack.enter_context(mock.patch.object(run_operator_console, "materialize_market_stress", return_value=1))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_macro_pressure", return_value=1))
             stack.enter_context(mock.patch.object(run_operator_console, "materialize_cycle_snapshots", return_value=3))
             stack.enter_context(mock.patch.object(run_operator_console, "materialize_lead_lag_relationships", return_value=2))
             stack.enter_context(mock.patch.object(run_operator_console, "materialize_alerts", return_value=3))
@@ -264,6 +267,7 @@ class QMISOperatorConsoleTests(unittest.TestCase):
             stack.enter_context(mock.patch.object(run_operator_console, "materialize_factors", return_value=0))
             stack.enter_context(mock.patch.object(run_operator_console, "materialize_relationships", return_value=0))
             stack.enter_context(mock.patch.object(run_operator_console, "materialize_market_stress", return_value=0))
+            stack.enter_context(mock.patch.object(run_operator_console, "materialize_macro_pressure", return_value=0))
             stack.enter_context(mock.patch.object(run_operator_console, "materialize_cycle_snapshots", return_value=0))
             stack.enter_context(mock.patch.object(run_operator_console, "materialize_lead_lag_relationships", return_value=0))
             stack.enter_context(mock.patch.object(run_operator_console, "materialize_alerts", return_value=0))
@@ -336,6 +340,7 @@ class QMISOperatorConsoleTests(unittest.TestCase):
                 mock.patch.object(run_operator_console, "materialize_factors", return_value=0),
                 mock.patch.object(run_operator_console, "materialize_relationships", return_value=0),
                 mock.patch.object(run_operator_console, "materialize_market_stress", return_value=0),
+                mock.patch.object(run_operator_console, "materialize_macro_pressure", return_value=0),
                 mock.patch.object(run_operator_console, "materialize_cycle_snapshots", return_value=0),
                 mock.patch.object(run_operator_console, "materialize_lead_lag_relationships", return_value=0),
                 mock.patch.object(run_operator_console, "materialize_alerts", return_value=0),

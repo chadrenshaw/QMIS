@@ -112,6 +112,74 @@ class QMISDashboardCLITests(unittest.TestCase):
                             "RECESSION RISK": ["soft growth score", "elevated volatility"],
                         }
                     ),
+                    "bayesian_evidence": json.dumps(
+                        {
+                            "LIQUIDITY WITHDRAWAL": ["liquidity tightening", "global liquidity contracting"],
+                            "RECESSION RISK": ["yield curve inversion", "credit spreads widening"],
+                        }
+                    ),
+                    "forward_regime_forecast": json.dumps(
+                        {
+                            "30d": {
+                                "horizon_days": 30,
+                                "top_regime": "LIQUIDITY WITHDRAWAL",
+                                "probability": 41.0,
+                                "distribution": {
+                                    "LIQUIDITY EXPANSION": 10.0,
+                                    "LIQUIDITY WITHDRAWAL": 41.0,
+                                    "RECESSION RISK": 27.0,
+                                    "STAGFLATION RISK": 10.0,
+                                    "DISINFLATION": 4.0,
+                                    "NEUTRAL": 8.0,
+                                },
+                            },
+                            "90d": {
+                                "horizon_days": 90,
+                                "top_regime": "RECESSION RISK",
+                                "probability": 36.0,
+                                "distribution": {
+                                    "LIQUIDITY EXPANSION": 16.0,
+                                    "LIQUIDITY WITHDRAWAL": 21.0,
+                                    "RECESSION RISK": 36.0,
+                                    "STAGFLATION RISK": 11.0,
+                                    "DISINFLATION": 8.0,
+                                    "NEUTRAL": 8.0,
+                                },
+                            },
+                            "180d": {
+                                "horizon_days": 180,
+                                "top_regime": "LIQUIDITY EXPANSION",
+                                "probability": 29.0,
+                                "distribution": {
+                                    "LIQUIDITY EXPANSION": 29.0,
+                                    "LIQUIDITY WITHDRAWAL": 17.0,
+                                    "RECESSION RISK": 24.0,
+                                    "STAGFLATION RISK": 9.0,
+                                    "DISINFLATION": 12.0,
+                                    "NEUTRAL": 9.0,
+                                },
+                            },
+                        }
+                    ),
+                }
+            ]
+        )
+        predictive_snapshots = pd.DataFrame(
+            [
+                {
+                    "ts": ts,
+                    "summary": "Forward macro signals point to rising recession risk. Inflation pressure remains present.",
+                    "forward_macro_signals": json.dumps(
+                        {
+                            "yield_curve": {"state": "Inverted", "summary": "Yield curve remains inverted and recession risk is rising.", "values": {"10y_3m_spread": -0.35}},
+                            "credit_spreads": {"state": "Widening", "summary": "Credit spreads are widening and systemic risk expectations are rising.", "values": {"credit_stress_score": 78.4}},
+                            "financial_conditions": {"state": "Tightening", "summary": "Financial conditions are tightening and growth slowdown risk is rising.", "values": {"financial_conditions_index": 0.66}},
+                            "real_rates": {"state": "Rising", "summary": "Real rates are rising and tightening financial conditions.", "values": {"real_rate": 1.8}},
+                            "global_liquidity": {"state": "Contracting", "summary": "Global liquidity is contracting and increases recession and volatility risk.", "values": {"global_liquidity_score": 34.2}},
+                            "manufacturing_momentum": {"state": "Weakening", "summary": "Manufacturing momentum is weakening and raises contraction risk.", "values": {"pmi": 49.2}},
+                        }
+                    ),
+                    "missing_inputs": json.dumps([]),
                 }
             ]
         )
@@ -166,6 +234,33 @@ class QMISDashboardCLITests(unittest.TestCase):
                         }
                     ),
                     "missing_inputs": json.dumps(["credit"]),
+                }
+            ]
+        )
+        macro_pressure = pd.DataFrame(
+            [
+                {
+                    "ts": ts,
+                    "mpi_score": 72.0,
+                    "pressure_level": "SEVERE PRESSURE",
+                    "summary": "Macro pressure is severe pressure led by volatility regime, breadth deterioration, credit spread widening.",
+                    "components": json.dumps(
+                        {
+                            "credit_stress": {"score": 76.0},
+                            "volatility_stress": {"score": 84.0},
+                            "breadth_stress": {"score": 81.0},
+                            "liquidity_stress": {"score": 65.0},
+                            "yield_curve_stress": {"score": 54.0},
+                        }
+                    ),
+                    "primary_contributors": json.dumps(
+                        [
+                            "volatility regime",
+                            "breadth deterioration",
+                            "credit spread widening",
+                        ]
+                    ),
+                    "missing_inputs": json.dumps([]),
                 }
             ]
         )
@@ -390,9 +485,11 @@ class QMISDashboardCLITests(unittest.TestCase):
                 ("features", features),
                 ("factors", factors),
                 ("stress_snapshots", stress),
+                ("macro_pressure_snapshots", macro_pressure),
                 ("cycle_snapshots", cycles),
                 ("breadth_snapshots", breadth_health),
                 ("liquidity_snapshots", liquidity_environment),
+                ("predictive_snapshots", predictive_snapshots),
                 ("regimes", regimes),
                 ("relationships", relationships),
             ):
@@ -413,6 +510,8 @@ class QMISDashboardCLITests(unittest.TestCase):
 
         self.assertEqual(snapshot["regime"]["regime_label"], "STAGFLATION RISK")
         self.assertEqual(snapshot["regime"]["regime_probabilities"]["LIQUIDITY WITHDRAWAL"], 34.0)
+        self.assertEqual(snapshot["regime"]["forward_regime_forecast"]["90d"]["top_regime"], "RECESSION RISK")
+        self.assertEqual(snapshot["regime"]["bayesian_evidence"]["LIQUIDITY WITHDRAWAL"][0], "liquidity tightening")
         self.assertEqual(snapshot["scores"]["inflation_score"], 3)
         self.assertAlmostEqual(snapshot["yield_curve"], 0.4, places=6)
         self.assertEqual(snapshot["yield_curve_state"], "NORMAL")
@@ -431,11 +530,15 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertEqual(snapshot["factors"][0]["direction"], "tightening")
         self.assertIn(False, [bool(row["passes_filter"]) for row in snapshot["factors"]])
         self.assertEqual(snapshot["market_stress"]["stress_level"], "HIGH")
+        self.assertEqual(snapshot["macro_pressure"]["pressure_level"], "SEVERE PRESSURE")
         self.assertEqual(snapshot["cycles"][0]["cycle_name"], "solar_cycle")
         self.assertEqual(snapshot["cycles"][1]["phase"], "waning_gibbous")
         self.assertEqual(snapshot["market_stress"]["missing_inputs"], ["credit"])
+        self.assertEqual(snapshot["macro_pressure"]["primary_contributors"][0], "volatility regime")
         self.assertEqual(snapshot["breadth_health"]["breadth_state"], "STRONG")
         self.assertEqual(snapshot["liquidity_environment"]["liquidity_state"], "EXPANDING")
+        self.assertEqual(snapshot["forward_macro_signals"]["yield_curve"]["state"], "Inverted")
+        self.assertEqual(snapshot["forward_macro_signals"]["global_liquidity"]["state"], "Contracting")
         self.assertEqual(
             snapshot["intelligence"]["global_state_line"],
             "Regime: STAGFLATION RISK | Volatility: MODERATE | Liquidity: EXPANDING | Growth: STABLE | Inflation: HOT",
@@ -443,11 +546,14 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertIn("Sun: Pisces", snapshot["intelligence"]["cosmic_state_line"])
         self.assertEqual(len(snapshot["intelligence"]["market_drivers"]), 0)
         self.assertEqual(snapshot["intelligence"]["market_stress"]["stress_level"], "HIGH")
+        self.assertEqual(snapshot["intelligence"]["macro_pressure"]["pressure_level"], "SEVERE PRESSURE")
         self.assertEqual(snapshot["intelligence"]["breadth_health"]["breadth_state"], "STRONG")
         self.assertEqual(snapshot["intelligence"]["liquidity_environment"]["liquidity_state"], "EXPANDING")
         self.assertEqual(snapshot["intelligence"]["cycle_monitor"][0]["label"], "Solar Cycle Phase")
         self.assertEqual(snapshot["intelligence"]["cycle_monitor"][2]["phase"], "Expanding")
         self.assertEqual(snapshot["intelligence"]["regime_probabilities"][0]["label"], "LIQUIDITY WITHDRAWAL")
+        self.assertEqual(snapshot["intelligence"]["forward_regime_forecast"][1]["horizon"], "90d")
+        self.assertEqual(snapshot["intelligence"]["forward_regime_forecast"][1]["top_regime"], "RECESSION RISK")
         self.assertEqual(snapshot["intelligence"]["divergences"][0]["title"], "Gold Rising With Yields")
         self.assertIn("gold", snapshot["intelligence"]["market_narrative"]["text"].lower())
         self.assertEqual(snapshot["divergences"][0]["persistence_label"], "persistent")
@@ -483,8 +589,19 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertIn("Solar: ELEVATED", output)
         self.assertIn("MARKET STRESS", output)
         self.assertIn("HIGH", output)
+        self.assertIn("MACRO PRESSURE INDEX", output)
+        self.assertIn("SEVERE PRESSURE (72.0)", output)
+        self.assertIn("Primary contributors: volatility regime, breadth deterioration, credit spread widening", output)
+        self.assertIn("FORWARD MACRO SIGNALS", output)
+        self.assertIn("Yield Curve: Inverted", output)
+        self.assertIn("Global Liquidity: Contracting", output)
         self.assertIn("REGIME PROBABILITIES", output)
         self.assertIn("LIQUIDITY WITHDRAWAL", output)
+        self.assertIn("FORWARD REGIME FORECAST", output)
+        self.assertIn("30d outlook", output)
+        self.assertIn("90d outlook", output)
+        self.assertIn("180d outlook", output)
+        self.assertIn("Recession Risk", output)
         self.assertIn("BREADTH HEALTH", output)
         self.assertIn("STRONG", output)
         self.assertIn("LIQUIDITY ENVIRONMENT", output)
@@ -507,6 +624,10 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertIn("EXPERIMENTAL SIGNALS", output)
         self.assertIn("STAGFLATION RISK", output)
         self.assertIn("sunspot_number", output)
+        self.assertLess(output.index("FORWARD MACRO SIGNALS"), output.index("REGIME PROBABILITIES"))
+        self.assertLess(output.index("REGIME PROBABILITIES"), output.index("FORWARD REGIME FORECAST"))
+        self.assertLess(output.index("MARKET STRESS"), output.index("MACRO PRESSURE INDEX"))
+        self.assertLess(output.index("MACRO PRESSURE INDEX"), output.index("CYCLE MONITOR"))
 
 
 if __name__ == "__main__":

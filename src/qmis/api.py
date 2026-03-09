@@ -67,7 +67,8 @@ def _fetch_latest_regime(db_path: Path) -> dict[str, Any] | None:
     with connect_db(db_path, read_only=True) as connection:
         rows = connection.execute(
             """
-            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence, regime_probabilities, regime_drivers
+            SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence,
+                   regime_probabilities, regime_drivers, bayesian_evidence, forward_regime_forecast
             FROM regimes
             ORDER BY ts DESC
             LIMIT 1
@@ -79,6 +80,8 @@ def _fetch_latest_regime(db_path: Path) -> dict[str, Any] | None:
     row = rows.iloc[0].to_dict()
     row["regime_probabilities"] = _parse_metadata(row.get("regime_probabilities"))
     row["regime_drivers"] = _parse_metadata(row.get("regime_drivers"))
+    row["bayesian_evidence"] = _parse_metadata(row.get("bayesian_evidence"))
+    row["forward_regime_forecast"] = _parse_metadata(row.get("forward_regime_forecast"))
     return _serialize_record(row)
 
 

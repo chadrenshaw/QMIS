@@ -20,7 +20,15 @@ MARKET_SERIES: dict[str, dict[str, str]] = {
     "HG=F": {"series_name": "copper", "asset_name": "Copper Futures", "unit": "usd"},
     "^GSPC": {"series_name": "sp500", "asset_name": "S&P500", "unit": "index_points"},
     "^VIX": {"series_name": "vix", "asset_name": "VIX Volatility Index", "unit": "index_points"},
+    "^VIX3M": {"series_name": "vix3m", "asset_name": "VIX 3-Month Volatility Index", "unit": "index_points"},
+    "^VIX6M": {"series_name": "vix6m", "asset_name": "VIX 6-Month Volatility Index", "unit": "index_points"},
     "DX-Y.NYB": {"series_name": "dollar_index", "asset_name": "US Dollar Index", "unit": "index_points"},
+    "SMH": {"series_name": "semiconductor_index", "asset_name": "VanEck Semiconductor ETF", "unit": "usd"},
+    "IWM": {"series_name": "small_caps", "asset_name": "iShares Russell 2000 ETF", "unit": "usd"},
+    "KBE": {"series_name": "bank_stocks", "asset_name": "SPDR S&P Bank ETF", "unit": "usd"},
+    "IYT": {"series_name": "transportation_index", "asset_name": "iShares Transportation Average ETF", "unit": "usd"},
+    "DBA": {"series_name": "agriculture_index", "asset_name": "Invesco DB Agriculture Fund", "unit": "usd"},
+    "DBC": {"series_name": "commodity_index", "asset_name": "Invesco DB Commodity Index Tracking Fund", "unit": "usd"},
 }
 
 

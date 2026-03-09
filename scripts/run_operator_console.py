@@ -39,6 +39,7 @@ from qmis.signals.cycles import materialize_cycle_snapshots
 from qmis.signals.factors import materialize_factors
 from qmis.signals.leadlag import materialize_lead_lag_relationships
 from qmis.signals.liquidity import materialize_liquidity_state
+from qmis.signals.macro_pressure import materialize_macro_pressure
 from qmis.signals.regime import materialize_regime
 from qmis.signals.stress import materialize_market_stress
 from qmis.storage import connect_db
@@ -341,6 +342,7 @@ def _refresh_pipeline(
         "factors": int(materialize_factors(db_path=db_path)),
         "relationships": int(materialize_relationships(db_path=db_path)),
         "stress": int(materialize_market_stress(db_path=db_path)),
+        "macro_pressure": int(materialize_macro_pressure(db_path=db_path)),
         "cycles": int(materialize_cycle_snapshots(db_path=db_path)),
         "lead_lag": int(materialize_lead_lag_relationships(db_path=db_path)),
         "alerts": int(materialize_alerts(db_path=db_path)),
@@ -355,7 +357,7 @@ def _render_refresh_summary(summary: dict[str, int | dict[str, int]], console: C
         "Refresh complete\n"
         f"Collectors: {collector_text}\n"
         f"Features: {summary['features']}  Regime: {summary['regime']}  Breadth: {summary['breadth']}  Liquidity: {summary['liquidity']}  Factors: {summary['factors']}  Stress: {summary['stress']}  "
-        f"Cycles: {summary['cycles']}  Relationships: {summary['relationships']}  Lead-lag: {summary['lead_lag']}  Alerts: {summary['alerts']}"
+        f"MPI: {summary['macro_pressure']}  Cycles: {summary['cycles']}  Relationships: {summary['relationships']}  Lead-lag: {summary['lead_lag']}  Alerts: {summary['alerts']}"
     )
     failures = summary.get("collector_failures", [])
     if failures:
