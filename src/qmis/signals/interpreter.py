@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
+from qmis.signals.narrative import build_market_narrative
+
 
 SIGNIFICANT_CORRELATION_THRESHOLD = 0.7
 SIGNIFICANCE_P_VALUE = 0.05
@@ -787,6 +789,7 @@ def build_operator_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "global_state_line": build_global_state_line(snapshot),
         "market_pulse": build_market_pulse(snapshot),
         "cosmic_state_line": build_cosmic_state_line(snapshot, world_state),
+        "market_narrative": build_market_narrative(snapshot),
         "market_stress": snapshot.get("market_stress"),
         "breadth_health": snapshot.get("breadth_health"),
         "liquidity_environment": snapshot.get("liquidity_environment"),

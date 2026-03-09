@@ -241,6 +241,8 @@ class QMISAPITests(unittest.TestCase):
         self.assertEqual(dashboard.json()["market_stress"]["missing_inputs"], ["credit"])
         self.assertEqual(dashboard.json()["breadth_health"]["breadth_state"], "WEAKENING")
         self.assertEqual(dashboard.json()["liquidity_environment"]["liquidity_state"], "NEUTRAL")
+        self.assertIn("narrative", dashboard.json())
+        self.assertIn("gold", dashboard.json()["narrative"]["text"].lower())
         self.assertEqual(dashboard.json()["divergences"][0]["title"], "Gold Rising With Yields")
         self.assertEqual(dashboard.json()["divergences"][0]["persistence_label"], "persistent")
         self.assertTrue(dashboard.json()["divergences"][0]["passes_filter"])

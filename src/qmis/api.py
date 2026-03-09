@@ -217,6 +217,7 @@ def create_app(db_path: Path | None = None, web_dist_dir: Path | None = None) ->
             "yield_curve_state": snapshot["yield_curve_state"],
             "freshness": _serialize_record(snapshot["freshness"]),
             "latest_snapshot_ts": _serialize_value(snapshot["latest_snapshot_ts"]),
+            "narrative": _serialize_record(snapshot["intelligence"]["market_narrative"]),
             "top_relationships": [_serialize_record(row) for row in snapshot["top_relationships"]],
             "lead_lag_relationships": [_serialize_record(row) for row in snapshot["lead_lag_relationships"]],
             "anomalies": [_serialize_record(row) for row in snapshot["anomalies"]],

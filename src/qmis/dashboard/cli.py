@@ -601,6 +601,12 @@ def _render_cosmic_state(snapshot: dict[str, Any], console: Console) -> None:
     console.print(Panel(snapshot["intelligence"]["cosmic_state_line"], title="COSMIC STATE", expand=False))
 
 
+def render_market_narrative(snapshot: dict[str, Any], console: Console) -> None:
+    narrative = snapshot["intelligence"].get("market_narrative") or {}
+    text = str(narrative.get("text") or "").strip()
+    console.print(Panel(text or "No market narrative available.", title="MARKET NARRATIVE", expand=False))
+
+
 def render_market_stress(snapshot: dict[str, Any], console: Console) -> None:
     stress = snapshot["intelligence"].get("market_stress")
     if not stress:
@@ -711,6 +717,7 @@ def render_dashboard(snapshot: dict[str, Any], console: Console | None = None) -
     render_world_snapshot(snapshot, console)
     _render_market_pulse(snapshot, console)
     _render_cosmic_state(snapshot, console)
+    render_market_narrative(snapshot, console)
     render_regime_probabilities(snapshot, console)
     render_market_stress(snapshot, console)
     render_breadth_health(snapshot, console)

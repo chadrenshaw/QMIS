@@ -422,6 +422,8 @@ class OperatorInterpreterTests(unittest.TestCase):
         self.assertIn("breadth", intelligence["market_stress"]["summary"].lower())
         self.assertTrue(intelligence["experimental_signals"]["visible"])
         self.assertEqual(intelligence["divergences"][0]["title"], "Crypto Decoupling From Liquidity")
+        self.assertIn("liquidity tightening", intelligence["market_narrative"]["text"].lower())
+        self.assertEqual(intelligence["market_narrative"]["evidence"][0]["kind"], "factor")
 
     def test_interpreter_groups_drivers_shifts_and_warnings(self) -> None:
         from qmis.signals.interpreter import build_operator_snapshot
