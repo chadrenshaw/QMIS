@@ -14,6 +14,7 @@ from qmis.config import load_config
 from qmis.dashboard.cli import load_dashboard_snapshot, _parse_metadata
 from qmis.schema import bootstrap_database
 from qmis.signals.anomalies import detect_relationship_anomalies
+from qmis.signals.divergence import detect_cross_market_divergences
 from qmis.storage import connect_db, get_default_db_path
 
 
@@ -125,6 +126,36 @@ def _fetch_anomalies(db_path: Path) -> list[dict[str, Any]]:
     return [_serialize_record(row) for row in anomalies.to_dict("records")]
 
 
+def _fetch_divergences(db_path: Path) -> list[dict[str, Any]]:
+    with connect_db(db_path, read_only=True) as connection:
+        relationships = connection.execute(
+            """
+            SELECT
+                ts,
+                series_x,
+                series_y,
+                window_days,
+                lag_days,
+                correlation,
+                p_value,
+                relationship_state,
+                confidence_label
+            FROM relationships
+            WHERE lag_days = 0
+            ORDER BY ts DESC, window_days DESC
+            """
+        ).fetchdf()
+        features = connection.execute(
+            """
+            SELECT ts, series_name, pct_change_30d, trend_label
+            FROM features
+            ORDER BY ts DESC, series_name
+            """
+        ).fetchdf()
+    divergences = detect_cross_market_divergences(relationships=relationships, features=features)
+    return [_serialize_record(row) for row in divergences.to_dict("records")]
+
+
 def create_app(db_path: Path | None = None, web_dist_dir: Path | None = None) -> FastAPI:
     """Create the optional read-only FastAPI application."""
     config = load_config()
@@ -152,6 +183,10 @@ def create_app(db_path: Path | None = None, web_dist_dir: Path | None = None) ->
     @app.get("/anomalies")
     def anomalies() -> dict[str, Any]:
         return {"anomalies": _fetch_anomalies(resolved_db_path)}
+
+    @app.get("/divergences")
+    def divergences() -> dict[str, Any]:
+        return {"divergences": _fetch_divergences(resolved_db_path)}
 
     @app.get("/alerts")
     def alerts() -> dict[str, Any]:
@@ -185,6 +220,7 @@ def create_app(db_path: Path | None = None, web_dist_dir: Path | None = None) ->
             "top_relationships": [_serialize_record(row) for row in snapshot["top_relationships"]],
             "lead_lag_relationships": [_serialize_record(row) for row in snapshot["lead_lag_relationships"]],
             "anomalies": [_serialize_record(row) for row in snapshot["anomalies"]],
+            "divergences": [_serialize_record(row) for row in snapshot["divergences"]],
             "alert_summary": _serialize_record(snapshot["alert_summary"]),
             "alerts": [_serialize_record(row) for row in snapshot["alerts"]],
         }

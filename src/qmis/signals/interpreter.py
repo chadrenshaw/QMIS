@@ -499,6 +499,28 @@ def build_market_drivers(snapshot: dict[str, Any]) -> list[dict[str, str]]:
     return drivers
 
 
+def build_divergence_summary(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = snapshot.get("divergences") or []
+    if not isinstance(rows, list):
+        return []
+    ordered = sorted(
+        (
+            {
+                "title": str(row.get("title", "")),
+                "summary": str(row.get("summary", "")),
+                "strength": float(row.get("strength", 0.0)),
+                "severity": str(row.get("severity", "developing")),
+                "persistence_label": str(row.get("persistence_label", "developing")),
+            }
+            for row in rows
+            if row.get("title")
+        ),
+        key=lambda item: item["strength"],
+        reverse=True,
+    )
+    return ordered[:3]
+
+
 def build_risk_monitor(snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
     vix = _signal_value(snapshot, "vix")
     pmi = _signal_value(snapshot, "pmi")
@@ -511,6 +533,7 @@ def build_risk_monitor(snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
     breadth_state = str(breadth_snapshot.get("breadth_state", "")).upper()
     liquidity_snapshot = _liquidity_environment(snapshot)
     liquidity_state = str(liquidity_snapshot.get("liquidity_state") or _liquidity_descriptor(snapshot)).upper()
+    divergence_rows = build_divergence_summary(snapshot)
 
     if liquidity_state == "TIGHTENING":
         liquidity_level = "HIGH"
@@ -562,6 +585,17 @@ def build_risk_monitor(snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
     else:
         systemic_level = "LOW"
 
+    top_divergence = divergence_rows[0] if divergence_rows else None
+    divergence_strength = float(top_divergence["strength"]) if top_divergence else 0.0
+    if divergence_strength >= 0.75:
+        divergence_level = "HIGH"
+    elif divergence_strength >= 0.5:
+        divergence_level = "MODERATE"
+    elif top_divergence:
+        divergence_level = "ELEVATED"
+    else:
+        divergence_level = "LOW"
+
     return {
         "volatility_risk": {"level": _risk_level_from_vix(vix), "summary": "Derived from the current VIX regime."},
         "breadth_risk": {
@@ -573,6 +607,10 @@ def build_risk_monitor(snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
             "summary": str(liquidity_snapshot.get("summary") or "Tracks tightening or easing liquidity conditions."),
         },
         "growth_risk": {"level": growth_level, "summary": "Blends PMI and breadth participation."},
+        "divergence_risk": {
+            "level": divergence_level,
+            "summary": str(top_divergence["summary"]) if top_divergence else "No major cross-market divergences detected.",
+        },
         "systemic_risk": {"level": systemic_level, "summary": "Combines base risk score, anomalies, and critical alerts."},
     }
 
@@ -638,8 +676,11 @@ def generate_operator_watchlist(snapshot: dict[str, Any]) -> list[dict[str, Any]
     risk = generate_risk_indicators(snapshot)
     relationship_changes = summarize_relationship_breaks(snapshot)
     breadth_snapshot = _breadth_health(snapshot)
+    divergence_rows = build_divergence_summary(snapshot)
 
     watch_items: list[dict[str, Any]] = []
+    for divergence in divergence_rows[:2]:
+        watch_items.append({"title": divergence["title"], "detail": divergence["summary"]})
     for change in relationship_changes[:2]:
         watch_items.append({"title": change["title"], "detail": change["summary"]})
 
@@ -692,8 +733,11 @@ def generate_operator_watchlist(snapshot: dict[str, Any]) -> list[dict[str, Any]
 
 def build_warning_signals(snapshot: dict[str, Any]) -> list[dict[str, str]]:
     warnings: list[dict[str, str]] = []
+    divergences = build_divergence_summary(snapshot)
     shifts = summarize_relationship_breaks(snapshot)
     breadth_snapshot = _breadth_health(snapshot)
+    if divergences:
+        warnings.append({"title": divergences[0]["title"], "detail": divergences[0]["summary"]})
     if shifts:
         warnings.append({"title": shifts[0]["title"], "detail": shifts[0]["summary"]})
 
@@ -740,6 +784,7 @@ def build_operator_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "breadth_health": snapshot.get("breadth_health"),
         "liquidity_environment": snapshot.get("liquidity_environment"),
         "regime_probabilities": build_regime_probability_summary(snapshot),
+        "divergences": build_divergence_summary(snapshot),
         "market_drivers": build_market_drivers(snapshot),
         "relationship_shifts": relationship_changes,
         "risk_monitor": risk_monitor,

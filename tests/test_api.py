@@ -51,6 +51,7 @@ class QMISAPITests(unittest.TestCase):
                 {"ts": ts, "series_name": "gold", "pct_change_30d": 7.0, "pct_change_90d": 12.0, "pct_change_365d": 20.0, "zscore_30d": 1.1, "volatility_30d": 0.1, "slope_30d": 0.3, "drawdown_90d": -1.0, "trend_label": "UP"},
                 {"ts": ts, "series_name": "BTCUSD", "pct_change_30d": 8.0, "pct_change_90d": 14.0, "pct_change_365d": 52.0, "zscore_30d": 1.3, "volatility_30d": 0.4, "slope_30d": 0.45, "drawdown_90d": -6.0, "trend_label": "UP"},
                 {"ts": ts, "series_name": "fed_balance_sheet", "pct_change_30d": 1.0, "pct_change_90d": 2.0, "pct_change_365d": 4.0, "zscore_30d": 0.4, "volatility_30d": 0.05, "slope_30d": 0.1, "drawdown_90d": -0.4, "trend_label": "SIDEWAYS"},
+                {"ts": ts, "series_name": "yield_10y", "pct_change_30d": 0.3, "pct_change_90d": 0.5, "pct_change_365d": 0.8, "zscore_30d": 0.2, "volatility_30d": 0.05, "slope_30d": 0.1, "drawdown_90d": -0.2, "trend_label": "UP"},
                 {"ts": ts, "series_name": "sp500_above_200dma", "pct_change_30d": -4.0, "pct_change_90d": -6.0, "pct_change_365d": 3.0, "zscore_30d": -0.3, "volatility_30d": 0.2, "slope_30d": -0.1, "drawdown_90d": -4.0, "trend_label": "DOWN"},
                 {"ts": ts, "series_name": "advance_decline_line", "pct_change_30d": -3.0, "pct_change_90d": -4.0, "pct_change_365d": 2.0, "zscore_30d": -0.2, "volatility_30d": 0.2, "slope_30d": -0.1, "drawdown_90d": -3.0, "trend_label": "DOWN"},
                 {"ts": ts, "series_name": "new_highs", "pct_change_30d": -8.0, "pct_change_90d": -10.0, "pct_change_365d": 4.0, "zscore_30d": -0.5, "volatility_30d": 0.2, "slope_30d": -0.2, "drawdown_90d": -5.0, "trend_label": "DOWN"},
@@ -95,6 +96,17 @@ class QMISAPITests(unittest.TestCase):
                     "p_value": 0.0001,
                     "relationship_state": "stable",
                     "confidence_label": "validated",
+                },
+                {
+                    "ts": ts,
+                    "series_x": "gold",
+                    "series_y": "yield_10y",
+                    "window_days": 90,
+                    "lag_days": 0,
+                    "correlation": -0.33,
+                    "p_value": 0.04,
+                    "relationship_state": "weakening",
+                    "confidence_label": "tentative",
                 },
                 {
                     "ts": ts,
@@ -186,6 +198,7 @@ class QMISAPITests(unittest.TestCase):
             signals = client.get("/signals/latest")
             relationships = client.get("/relationships")
             anomalies = client.get("/anomalies")
+            divergences = client.get("/divergences")
             alerts = client.get("/alerts")
             dashboard = client.get("/dashboard")
 
@@ -200,10 +213,12 @@ class QMISAPITests(unittest.TestCase):
         self.assertIn("gold", signals.json()["signals"])
 
         self.assertEqual(relationships.status_code, 200)
-        self.assertEqual(len(relationships.json()["relationships"]), 3)
+        self.assertEqual(len(relationships.json()["relationships"]), 4)
 
         self.assertEqual(anomalies.status_code, 200)
         self.assertEqual(anomalies.json()["anomalies"][0]["anomaly_type"], "relationship_break")
+        self.assertEqual(divergences.status_code, 200)
+        self.assertEqual(divergences.json()["divergences"][0]["title"], "Gold Rising With Yields")
 
         self.assertEqual(alerts.status_code, 200)
         self.assertEqual(alerts.json()["summary"]["status"], "active")
@@ -223,6 +238,7 @@ class QMISAPITests(unittest.TestCase):
         self.assertEqual(dashboard.json()["market_stress"]["missing_inputs"], ["credit"])
         self.assertEqual(dashboard.json()["breadth_health"]["breadth_state"], "WEAKENING")
         self.assertEqual(dashboard.json()["liquidity_environment"]["liquidity_state"], "NEUTRAL")
+        self.assertEqual(dashboard.json()["divergences"][0]["title"], "Gold Rising With Yields")
         self.assertIn("market", dashboard.json()["signal_groups"])
         self.assertIn("gold", dashboard.json()["signal_groups"]["market"])
 

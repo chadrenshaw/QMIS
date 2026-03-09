@@ -15,6 +15,7 @@ from rich.text import Text
 from qmis.alerts.engine import load_alert_snapshot
 from qmis.schema import bootstrap_database
 from qmis.signals.anomalies import detect_relationship_anomalies
+from qmis.signals.divergence import detect_cross_market_divergences
 from qmis.signals.interpreter import build_operator_snapshot
 from qmis.storage import connect_db, get_default_db_path
 
@@ -349,6 +350,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
     top_relationships = zero_lag.loc[zero_lag["relationship_state"] != "broken"].head(3).to_dict("records")
     lead_lag_relationships = lead_lag.head(3).to_dict("records")
     anomalies = detect_relationship_anomalies(zero_lag).to_dict("records")
+    divergences = detect_cross_market_divergences(relationships=zero_lag, features=feature_rows).to_dict("records")
     signal_history: dict[str, list[dict[str, Any]]] = {}
     for series_name, frame in history_series.groupby("series_name"):
         signal_history[str(series_name)] = [
@@ -444,6 +446,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         "top_relationships": top_relationships,
         "lead_lag_relationships": lead_lag_relationships,
         "anomalies": anomalies,
+        "divergences": divergences,
         "alert_summary": alert_summary,
         "alerts": alert_rows.to_dict("records"),
     }
@@ -651,6 +654,15 @@ def render_market_forces(snapshot: dict[str, Any], console: Console) -> None:
     console.print(Panel(body, title="PRIMARY MARKET DRIVERS", expand=False))
 
 
+def render_divergences(snapshot: dict[str, Any], console: Console) -> None:
+    rows = snapshot["intelligence"].get("divergences", [])
+    if not rows:
+        console.print(Panel("- No regime-relevant divergences detected.", title="CROSS-MARKET DIVERGENCES", expand=False))
+        return
+    body = "\n".join(f"- {row['title']}: {row['summary']}" for row in rows[:3])
+    console.print(Panel(body, title="CROSS-MARKET DIVERGENCES", expand=False))
+
+
 def render_relationship_changes(snapshot: dict[str, Any], console: Console) -> None:
     rows = snapshot["intelligence"]["relationship_shifts"]
     body = "\n".join(f"- {row['title']}: {row['summary']}" for row in rows[:4]) if rows else "- No material relationship shifts."
@@ -702,6 +714,7 @@ def render_dashboard(snapshot: dict[str, Any], console: Console | None = None) -
     render_breadth_health(snapshot, console)
     render_liquidity_environment(snapshot, console)
     render_market_forces(snapshot, console)
+    render_divergences(snapshot, console)
     render_relationship_changes(snapshot, console)
     render_risk_indicators(snapshot, console)
     render_watchlist(snapshot, console)

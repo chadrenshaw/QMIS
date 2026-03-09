@@ -357,6 +357,21 @@ class OperatorInterpreterTests(unittest.TestCase):
                     "current_state": "broken",
                 },
             ],
+            "divergences": [
+                {
+                    "divergence_key": "crypto_vs_liquidity",
+                    "title": "Crypto Decoupling From Liquidity",
+                    "series_x": "BTCUSD",
+                    "series_y": "fed_balance_sheet",
+                    "expected_direction": "positive",
+                    "observed_direction": "opposite_moves",
+                    "persistence_windows": 2,
+                    "persistence_label": "persistent",
+                    "strength": 0.83,
+                    "severity": "strong",
+                    "summary": "BTCUSD is rising while the Fed balance sheet contracts, breaking a historically positive 365d relationship across the 90d and 30d windows.",
+                }
+            ],
             "alerts": [
                 {
                     "severity": "critical",
@@ -392,6 +407,7 @@ class OperatorInterpreterTests(unittest.TestCase):
         self.assertEqual(intelligence["risk_monitor"]["liquidity_risk"]["level"], "HIGH")
         self.assertEqual(intelligence["risk_monitor"]["breadth_risk"]["level"], "HIGH")
         self.assertEqual(intelligence["risk_monitor"]["growth_risk"]["level"], "HIGH")
+        self.assertEqual(intelligence["risk_monitor"]["divergence_risk"]["level"], "HIGH")
         self.assertEqual(intelligence["risk_monitor"]["systemic_risk"]["level"], "CRITICAL")
         self.assertEqual(intelligence["market_stress"]["stress_level"], "HIGH")
         self.assertEqual(intelligence["liquidity_environment"]["liquidity_state"], "TIGHTENING")
@@ -399,6 +415,7 @@ class OperatorInterpreterTests(unittest.TestCase):
         self.assertEqual(intelligence["regime_probabilities"][0]["label"], "LIQUIDITY WITHDRAWAL")
         self.assertIn("breadth", intelligence["market_stress"]["summary"].lower())
         self.assertTrue(intelligence["experimental_signals"]["visible"])
+        self.assertEqual(intelligence["divergences"][0]["title"], "Crypto Decoupling From Liquidity")
 
     def test_interpreter_groups_drivers_shifts_and_warnings(self) -> None:
         from qmis.signals.interpreter import build_operator_snapshot
@@ -411,7 +428,7 @@ class OperatorInterpreterTests(unittest.TestCase):
         self.assertEqual(intelligence["market_drivers"][1]["title"], "Crypto Cycle")
         self.assertEqual(intelligence["relationship_shifts"][0]["title"], "Crypto vs Macro Decoupling")
         self.assertEqual(len(intelligence["warning_signals"]), 3)
-        self.assertIn("rising volatility", " ".join(item["title"].lower() for item in intelligence["warning_signals"]))
+        self.assertIn("crypto decoupling from liquidity", " ".join(item["title"].lower() for item in intelligence["warning_signals"]))
         self.assertIn("breadth deterioration", " ".join(item["title"].lower() for item in intelligence["warning_signals"]))
 
 

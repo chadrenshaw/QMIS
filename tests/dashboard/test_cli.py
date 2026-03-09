@@ -77,6 +77,7 @@ class QMISDashboardCLITests(unittest.TestCase):
                 {"ts": ts, "series_name": "new_lows", "pct_change_30d": -14.0, "pct_change_90d": -18.0, "pct_change_365d": -24.0, "zscore_30d": -0.9, "volatility_30d": 0.3, "slope_30d": -0.2, "drawdown_90d": -2.0, "trend_label": "DOWN"},
                 {"ts": ts, "series_name": "vix", "pct_change_30d": -2.0, "pct_change_90d": -4.0, "pct_change_365d": 1.0, "zscore_30d": -0.4, "volatility_30d": 0.3, "slope_30d": -0.1, "drawdown_90d": -5.0, "trend_label": "SIDEWAYS"},
                 {"ts": ts, "series_name": "pmi", "pct_change_30d": 7.0, "pct_change_90d": 10.0, "pct_change_365d": 12.0, "zscore_30d": 1.2, "volatility_30d": 0.1, "slope_30d": 0.2, "drawdown_90d": -1.5, "trend_label": "UP"},
+                {"ts": ts, "series_name": "yield_10y", "pct_change_30d": 0.2, "pct_change_90d": 0.4, "pct_change_365d": 0.8, "zscore_30d": 0.5, "volatility_30d": 0.1, "slope_30d": 0.1, "drawdown_90d": -0.2, "trend_label": "UP"},
                 {"ts": ts, "series_name": "fed_balance_sheet", "pct_change_30d": 5.0, "pct_change_90d": 7.0, "pct_change_365d": 14.0, "zscore_30d": 0.8, "volatility_30d": 0.1, "slope_30d": 0.1, "drawdown_90d": -2.0, "trend_label": "SIDEWAYS"},
                 {"ts": ts, "series_name": "reverse_repo_usage", "pct_change_30d": -8.0, "pct_change_90d": -10.0, "pct_change_365d": -30.0, "zscore_30d": -1.4, "volatility_30d": 0.2, "slope_30d": -0.4, "drawdown_90d": -12.0, "trend_label": "DOWN"},
                 {"ts": ts, "series_name": "sunspot_number", "pct_change_30d": 13.0, "pct_change_90d": 18.0, "pct_change_365d": 42.0, "zscore_30d": 1.7, "volatility_30d": 0.4, "slope_30d": 0.7, "drawdown_90d": -6.0, "trend_label": "UP"},
@@ -266,6 +267,17 @@ class QMISDashboardCLITests(unittest.TestCase):
                     "ts": ts,
                     "series_x": "gold",
                     "series_y": "yield_10y",
+                    "window_days": 90,
+                    "lag_days": 0,
+                    "correlation": -0.34,
+                    "p_value": 0.03,
+                    "relationship_state": "weakening",
+                    "confidence_label": "tentative",
+                },
+                {
+                    "ts": ts,
+                    "series_x": "gold",
+                    "series_y": "yield_10y",
                     "window_days": 30,
                     "lag_days": 0,
                     "correlation": -0.03,
@@ -370,6 +382,7 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertEqual(len(snapshot["top_relationships"]), 3)
         self.assertEqual(len(snapshot["lead_lag_relationships"]), 0)
         self.assertEqual(len(snapshot["anomalies"]), 3)
+        self.assertEqual(snapshot["divergences"][0]["title"], "Gold Rising With Yields")
         self.assertEqual(snapshot["alert_summary"]["status"], "active")
         self.assertGreaterEqual(len(snapshot["alerts"]), 2)
         self.assertEqual(snapshot["factors"][0]["factor_name"], "liquidity")
@@ -388,8 +401,10 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertEqual(snapshot["intelligence"]["breadth_health"]["breadth_state"], "STRONG")
         self.assertEqual(snapshot["intelligence"]["liquidity_environment"]["liquidity_state"], "EXPANDING")
         self.assertEqual(snapshot["intelligence"]["regime_probabilities"][0]["label"], "LIQUIDITY WITHDRAWAL")
+        self.assertEqual(snapshot["intelligence"]["divergences"][0]["title"], "Gold Rising With Yields")
         self.assertEqual(snapshot["intelligence"]["relationship_shifts"][0]["title"], "Crypto vs Macro Decoupling")
         self.assertEqual(snapshot["intelligence"]["risk_monitor"]["breadth_risk"]["level"], "LOW")
+        self.assertEqual(snapshot["intelligence"]["risk_monitor"]["divergence_risk"]["level"], "MODERATE")
         self.assertEqual(snapshot["intelligence"]["risk_monitor"]["systemic_risk"]["level"], "HIGH")
 
     def test_render_dashboard_writes_required_sections(self) -> None:
@@ -426,9 +441,12 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertIn("PRIMARY MARKET DRIVERS", output)
         self.assertIn("Liquidity Tightening", output)
         self.assertIn("Crypto Cycle", output)
+        self.assertIn("CROSS-MARKET DIVERGENCES", output)
+        self.assertIn("Gold Rising With Yields", output)
         self.assertIn("RELATIONSHIP SHIFTS", output)
         self.assertIn("Crypto vs Macro Decoupling", output)
         self.assertIn("RISK MONITOR", output)
+        self.assertIn("divergence_risk", output)
         self.assertIn("systemic_risk", output)
         self.assertIn("WARNING SIGNALS", output)
         self.assertIn("EXPERIMENTAL SIGNALS", output)
