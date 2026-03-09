@@ -46,6 +46,7 @@ class QMISDeploymentAssetTests(unittest.TestCase):
         self.assertIn("appleboy/drone-ssh", woodpecker)
         self.assertIn("target: /srv/docker/qmis/", woodpecker)
         self.assertIn("source: docker/deploy.sh", woodpecker)
+        self.assertIn("strip_components: 1", woodpecker)
         self.assertIn("/srv/docker/qmis/deploy.sh", woodpecker)
         self.assertIn("DEV_DOCKER_HOST_IP", woodpecker)
         self.assertIn("DOCKER_HOST_USER", woodpecker)

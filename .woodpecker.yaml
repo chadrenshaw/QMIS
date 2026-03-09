@@ -132,6 +132,7 @@ steps:
       port: 22
       target: /srv/docker/qmis/
       source: docker/deploy.sh
+      strip_components: 1
     when:
       event:
         - push
