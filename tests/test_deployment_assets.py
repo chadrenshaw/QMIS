@@ -29,12 +29,13 @@ class QMISDeploymentAssetTests(unittest.TestCase):
         self.assertIn("docker build", readme)
         self.assertIn("docker run", readme)
         self.assertIn("docker compose up", readme)
-        self.assertIn("gitea.chadlee.org/crenshaw/QMIS", readme)
+        self.assertIn("https://gitea.chadlee.org/crenshaw/QMIS", readme)
         self.assertIn("gitea_registry_username", readme)
         self.assertIn("gitea_registry_password", readme)
-        self.assertIn("gitea.chadlee.org/crenshaw/QMIS:latest", compose)
+        self.assertIn("gitea.chadlee.org/crenshaw/qmis:latest", readme)
+        self.assertIn("gitea.chadlee.org/crenshaw/qmis:latest", compose)
         self.assertIn("woodpeckerci/plugin-docker-buildx", woodpecker)
-        self.assertIn("gitea.chadlee.org/${CI_REPO_OWNER}/${CI_REPO_NAME}", woodpecker)
+        self.assertIn("repo: gitea.chadlee.org/${CI_REPO_OWNER}/qmis", woodpecker)
 
 
 if __name__ == "__main__":

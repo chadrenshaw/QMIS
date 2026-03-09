@@ -20,7 +20,7 @@ steps:
       - frontend-tests-and-build
     settings:
       registry: gitea.chadlee.org
-      repo: gitea.chadlee.org/${CI_REPO_OWNER}/${CI_REPO_NAME}
+      repo: gitea.chadlee.org/${CI_REPO_OWNER}/qmis
       dockerfile: Dockerfile
       dry_run: true
       build_args_from_env:
@@ -38,7 +38,7 @@ steps:
       - verify-container-build
     settings:
       registry: gitea.chadlee.org
-      repo: gitea.chadlee.org/${CI_REPO_OWNER}/${CI_REPO_NAME}
+      repo: gitea.chadlee.org/${CI_REPO_OWNER}/qmis
       dockerfile: Dockerfile
       username:
         from_secret: gitea_registry_username
@@ -61,7 +61,7 @@ steps:
       - verify-container-build
     settings:
       registry: gitea.chadlee.org
-      repo: gitea.chadlee.org/${CI_REPO_OWNER}/${CI_REPO_NAME}
+      repo: gitea.chadlee.org/${CI_REPO_OWNER}/qmis
       dockerfile: Dockerfile
       username:
         from_secret: gitea_registry_username
