@@ -34,7 +34,17 @@ DASHBOARD_HISTORY_SERIES = (
     "dollar_index",
 )
 
-SIGNAL_GROUP_ORDER = ("market", "macro", "liquidity", "crypto", "astronomy", "natural")
+SIGNAL_GROUP_ORDER = ("market", "breadth", "macro", "liquidity", "crypto", "astronomy", "natural")
+
+CATEGORY_TITLES = {
+    "market": "Market Signals",
+    "breadth": "Breadth Signals",
+    "macro": "Macro Signals",
+    "liquidity": "Liquidity Signals",
+    "crypto": "Crypto Signals",
+    "astronomy": "Astronomy Signals",
+    "natural": "Natural Signals",
+}
 
 
 def _latest_rows(connection, table_name: str, value_columns: str = "*"):
@@ -246,6 +256,20 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         for category in SIGNAL_GROUP_ORDER
         if any(signal.get("category") == category for signal in signal_summary.values())
     }
+    grouped_signals = {
+        category: [
+            {
+                "series_name": series_name,
+                "trend_label": trend_summary.get(series_name, {}).get("trend_label", "N/A"),
+                "value": signal_summary[series_name]["value"],
+                "unit": signal_summary[series_name]["unit"],
+                "source": signal_summary[series_name]["source"],
+                "ts": signal_summary[series_name]["ts"],
+            }
+            for series_name in sorted(signal_groups[category])
+        ]
+        for category in signal_groups
+    }
     freshness = _build_freshness(
         latest_signal_ts=signal_rows["ts"].max() if not signal_rows.empty else None,
         latest_regime_ts=regime_rows["ts"].max() if not regime_rows.empty else None,
@@ -269,6 +293,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         "trend_summary": trend_summary,
         "signal_summary": signal_summary,
         "signal_groups": signal_groups,
+        "grouped_signals": grouped_signals,
         "signal_history": signal_history,
         "scores": scores,
         "score_history": score_history,
@@ -302,6 +327,35 @@ def _build_signal_summary_table(snapshot: dict[str, Any]) -> Table:
     vix_value = signal_summary.get("vix", {}).get("value")
     table.add_row("Yield Curve", snapshot["yield_curve_state"], f"{snapshot['yield_curve']:.2f}" if snapshot["yield_curve"] is not None else "N/A")
     table.add_row("VIX", "LEVEL", f"{vix_value:,.2f}" if vix_value is not None else "N/A")
+    return table
+
+
+def _format_signal_value(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{float(value):,.2f}"
+
+
+def _build_category_signal_table(category: str, rows: list[dict[str, Any]]) -> Table:
+    table = Table(title=CATEGORY_TITLES.get(category, f"{category.title()} Signals"))
+    table.add_column("Signal")
+    table.add_column("Trend", justify="center")
+    table.add_column("Value", justify="right")
+    table.add_column("Unit")
+    table.add_column("Source")
+
+    if not rows:
+        table.add_row("No data", "-", "-", "-", "-")
+        return table
+
+    for row in rows:
+        table.add_row(
+            str(row["series_name"]),
+            str(row["trend_label"]),
+            _format_signal_value(row.get("value")),
+            str(row["unit"]),
+            str(row["source"]),
+        )
     return table
 
 
@@ -393,6 +447,10 @@ def render_dashboard(snapshot: dict[str, Any], console: Console | None = None) -
     console.print(Panel(title, expand=False))
 
     console.print(_build_signal_summary_table(snapshot))
+    for category in SIGNAL_GROUP_ORDER:
+        rows = snapshot["grouped_signals"].get(category, [])
+        if rows:
+            console.print(_build_category_signal_table(category, rows))
     console.print(_build_scores_table(snapshot))
 
     regime_label = snapshot["regime"]["regime_label"] if snapshot["regime"] else "N/A"

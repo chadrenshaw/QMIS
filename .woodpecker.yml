@@ -41,9 +41,9 @@ steps:
       repo: gitea.chadlee.org/${CI_REPO_OWNER}/qmis
       dockerfile: Dockerfile
       username:
-        from_secret: gitea_registry_username
+        from_secret: REGISTRY_USER
       password:
-        from_secret: gitea_registry_password
+        from_secret: REGISTRY_PASS
       tags:
         - latest
       build_args_from_env:
@@ -64,9 +64,9 @@ steps:
       repo: gitea.chadlee.org/${CI_REPO_OWNER}/qmis
       dockerfile: Dockerfile
       username:
-        from_secret: gitea_registry_username
+        from_secret: REGISTRY_USER
       password:
-        from_secret: gitea_registry_password
+        from_secret: REGISTRY_PASS
       auto_tag: true
       build_args_from_env:
         - CI_REPO_URL

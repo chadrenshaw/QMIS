@@ -35,7 +35,7 @@ class QMISFoundationTests(unittest.TestCase):
         self.assertEqual(qmis.dashboard.__name__, "qmis.dashboard")
 
     def test_runtime_scripts_support_dry_run(self) -> None:
-        for script_name in ("run_collectors.py", "run_analysis.py", "run_alerts.py", "run_dashboard.py"):
+        for script_name in ("run_collectors.py", "run_analysis.py", "run_alerts.py", "run_dashboard.py", "run_operator_console.py"):
             script_path = REPO_ROOT / "scripts" / script_name
             result = subprocess.run(
                 [sys.executable, str(script_path), "--dry-run"],

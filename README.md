@@ -2,6 +2,30 @@
 
 QMIS is a DuckDB-backed macro signal engine with collectors, analysis jobs, a Rich CLI dashboard, and an optional read-only FastAPI surface.
 
+## Local CLI
+
+The current local operator workflow is DuckDB-backed. Use the operator console to refresh all collectors, run analysis and alert materialization, then render the consolidated CLI dashboard with the current market, macro, liquidity, crypto, breadth, astronomy, and natural signal systems.
+
+```bash
+uv sync --frozen
+uv run python scripts/run_operator_console.py
+```
+
+If you want to render the dashboard from the existing database state without refetching data:
+
+```bash
+uv run python scripts/run_operator_console.py --no-refresh
+```
+
+For the split runtime entrypoints, use:
+
+```bash
+uv run python scripts/run_collectors.py --cadence all
+uv run python scripts/run_analysis.py
+uv run python scripts/run_alerts.py
+uv run python scripts/run_dashboard.py
+```
+
 ## Frontend Scaffold
 
 The browser dashboard scaffold lives in `web/` and builds as a static Vite app so it can later be served by the Python container.
