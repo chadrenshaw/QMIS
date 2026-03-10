@@ -37,7 +37,7 @@ class QMISRegimeTests(unittest.TestCase):
                 self.assertGreaterEqual(confidence, 0.0)
                 self.assertLessEqual(confidence, 1.0)
 
-    def test_materialize_regime_replaces_regime_rows_from_latest_inputs(self) -> None:
+    def test_materialize_regime_builds_current_regime_from_latest_feature_per_series(self) -> None:
         from qmis.schema import bootstrap_database
         from qmis.signals.regime import materialize_regime
         from qmis.storage import connect_db
@@ -46,43 +46,23 @@ class QMISRegimeTests(unittest.TestCase):
             db_path = Path(temp_dir) / "qmis.duckdb"
             bootstrap_database(db_path)
             ts = pd.Timestamp("2026-03-08")
+            crypto_ts = pd.Timestamp("2026-03-08 12:15:00")
             feature_payload = pd.DataFrame(
-                {
-                    "ts": [ts] * 11,
-                    "series_name": [
-                        "gold",
-                        "oil",
-                        "yield_10y",
-                        "copper",
-                        "sp500",
-                        "pmi",
-                        "fed_balance_sheet",
-                        "m2_money_supply",
-                        "reverse_repo_usage",
-                        "dollar_index",
-                        "vix",
-                    ],
-                    "pct_change_30d": [6.0] * 11,
-                    "pct_change_90d": [6.0] * 11,
-                    "pct_change_365d": [6.0] * 11,
-                    "zscore_30d": [1.0] * 11,
-                    "volatility_30d": [0.1] * 11,
-                    "slope_30d": [1.0] * 11,
-                    "drawdown_90d": [0.0] * 11,
-                    "trend_label": [
-                        "UP",
-                        "UP",
-                        "UP",
-                        "UP",
-                        "UP",
-                        "UP",
-                        "UP",
-                        "UP",
-                        "DOWN",
-                        "DOWN",
-                        "SIDEWAYS",
-                    ],
-                }
+                [
+                    {"ts": ts, "series_name": "gold", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "oil", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts - pd.Timedelta(days=2), "series_name": "yield_10y", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "copper", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "sp500", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts - pd.Timedelta(days=30), "series_name": "pmi", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts - pd.Timedelta(days=4), "series_name": "fed_balance_sheet", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts - pd.Timedelta(days=65), "series_name": "m2_money_supply", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "reverse_repo_usage", "pct_change_30d": -6.0, "pct_change_90d": -6.0, "pct_change_365d": -6.0, "zscore_30d": -1.0, "volatility_30d": 0.1, "slope_30d": -1.0, "drawdown_90d": 0.0, "trend_label": "DOWN"},
+                    {"ts": ts, "series_name": "dollar_index", "pct_change_30d": -6.0, "pct_change_90d": -6.0, "pct_change_365d": -6.0, "zscore_30d": -1.0, "volatility_30d": 0.1, "slope_30d": -1.0, "drawdown_90d": 0.0, "trend_label": "DOWN"},
+                    {"ts": ts, "series_name": "vix", "pct_change_30d": 0.0, "pct_change_90d": 0.0, "pct_change_365d": 0.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                    {"ts": crypto_ts, "series_name": "BTC_dominance", "pct_change_30d": 3.0, "pct_change_90d": 4.0, "pct_change_365d": 5.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 0.4, "drawdown_90d": -1.0, "trend_label": "UP"},
+                    {"ts": crypto_ts, "series_name": "crypto_market_cap", "pct_change_30d": 3.0, "pct_change_90d": 4.0, "pct_change_365d": 5.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 0.4, "drawdown_90d": -1.0, "trend_label": "UP"},
+                ]
             )
             signal_payload = pd.DataFrame(
                 {
@@ -179,8 +159,8 @@ class QMISRegimeTests(unittest.TestCase):
                 connection.close()
 
         self.assertEqual(inserted_rows, 1)
-        self.assertEqual(len(persisted), 1)
-        row = persisted.iloc[0].to_dict()
+        self.assertGreaterEqual(len(persisted), 1)
+        row = persisted.sort_values("ts").iloc[-1].to_dict()
         self.assertEqual(row["inflation_score"], 3)
         self.assertEqual(row["growth_score"], 3)
         self.assertEqual(row["liquidity_score"], 4)
@@ -204,6 +184,146 @@ class QMISRegimeTests(unittest.TestCase):
         self.assertEqual(len(macro_pressure_persisted), 1)
         forward_signals = json.loads(predictive_persisted.iloc[0]["forward_macro_signals"])
         self.assertEqual(forward_signals["yield_curve"]["state"], "Normal")
+
+    def test_materialize_regime_preserves_history_across_distinct_runs(self) -> None:
+        from qmis.schema import bootstrap_database
+        from qmis.signals.regime import materialize_regime
+        from qmis.storage import connect_db
+
+        def feature_rows(ts: pd.Timestamp, *, gold_trend: str, oil_trend: str) -> pd.DataFrame:
+            return pd.DataFrame(
+                [
+                    {"ts": ts, "series_name": "gold", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": gold_trend},
+                    {"ts": ts, "series_name": "oil", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": oil_trend},
+                    {"ts": ts, "series_name": "yield_10y", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "copper", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "sp500", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "pmi", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "fed_balance_sheet", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "m2_money_supply", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "reverse_repo_usage", "pct_change_30d": -6.0, "pct_change_90d": -6.0, "pct_change_365d": -6.0, "zscore_30d": -1.0, "volatility_30d": 0.1, "slope_30d": -1.0, "drawdown_90d": 0.0, "trend_label": "DOWN"},
+                    {"ts": ts, "series_name": "dollar_index", "pct_change_30d": -6.0, "pct_change_90d": -6.0, "pct_change_365d": -6.0, "zscore_30d": -1.0, "volatility_30d": 0.1, "slope_30d": -1.0, "drawdown_90d": 0.0, "trend_label": "DOWN"},
+                    {"ts": ts, "series_name": "vix", "pct_change_30d": 0.0, "pct_change_90d": 0.0, "pct_change_365d": 0.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                ]
+            )
+
+        def signal_rows(ts: pd.Timestamp, yield_10y: float, yield_3m: float) -> pd.DataFrame:
+            return pd.DataFrame(
+                [
+                    {"ts": ts, "source": "test", "category": "macro", "series_name": "yield_10y", "value": yield_10y, "unit": "percent", "metadata": "{}"},
+                    {"ts": ts, "source": "test", "category": "macro", "series_name": "yield_3m", "value": yield_3m, "unit": "percent", "metadata": "{}"},
+                ]
+            )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "qmis.duckdb"
+            bootstrap_database(db_path)
+            ts_one = pd.Timestamp("2026-03-08")
+            ts_two = pd.Timestamp("2026-03-09")
+            with connect_db(db_path) as connection:
+                for table_name, payload in (
+                    ("features", feature_rows(ts_one, gold_trend="UP", oil_trend="UP")),
+                    ("signals", signal_rows(ts_one, 4.2, 3.8)),
+                    ("breadth_snapshots", pd.DataFrame([{"ts": ts_one, "breadth_score": 74.0, "breadth_state": "STRONG", "summary": "Breadth is strong.", "components": "{}", "missing_inputs": "[]"}])),
+                    ("liquidity_snapshots", pd.DataFrame([{"ts": ts_one, "liquidity_score": 68.0, "liquidity_state": "EXPANDING", "summary": "Liquidity is expanding.", "components": "{}", "missing_inputs": "[]"}])),
+                    ("stress_snapshots", pd.DataFrame([{"ts": ts_one, "stress_score": 24.0, "stress_level": "LOW", "summary": "Stress is low.", "components": "{}", "missing_inputs": "[]"}])),
+                ):
+                    connection.register(f"{table_name}_df", payload)
+                    connection.execute(f"INSERT INTO {table_name} SELECT * FROM {table_name}_df")
+                    connection.unregister(f"{table_name}_df")
+
+            materialize_regime(db_path=db_path)
+
+            with connect_db(db_path) as connection:
+                for table_name, payload in (
+                    ("features", feature_rows(ts_two, gold_trend="DOWN", oil_trend="UP")),
+                    ("signals", signal_rows(ts_two, 4.0, 4.3)),
+                    ("breadth_snapshots", pd.DataFrame([{"ts": ts_two, "breadth_score": 44.0, "breadth_state": "WEAKENING", "summary": "Breadth is weakening.", "components": "{}", "missing_inputs": "[]"}])),
+                    ("liquidity_snapshots", pd.DataFrame([{"ts": ts_two, "liquidity_score": 42.0, "liquidity_state": "TIGHTENING", "summary": "Liquidity is tightening.", "components": "{}", "missing_inputs": "[]"}])),
+                    ("stress_snapshots", pd.DataFrame([{"ts": ts_two, "stress_score": 61.0, "stress_level": "HIGH", "summary": "Stress is high.", "components": "{}", "missing_inputs": "[]"}])),
+                ):
+                    connection.register(f"{table_name}_df", payload)
+                    connection.execute(f"INSERT INTO {table_name} SELECT * FROM {table_name}_df")
+                    connection.unregister(f"{table_name}_df")
+
+            materialize_regime(db_path=db_path)
+
+            connection = duckdb.connect(str(db_path), read_only=True)
+            try:
+                persisted = connection.execute(
+                    "SELECT ts, inflation_score, growth_score, liquidity_score, risk_score FROM regimes ORDER BY ts"
+                ).fetchdf()
+            finally:
+                connection.close()
+
+        self.assertEqual(len(persisted), 2)
+        self.assertEqual(list(persisted["ts"].dt.strftime("%Y-%m-%d")), ["2026-03-08", "2026-03-09"])
+
+    def test_materialize_regime_backfills_historical_rows_on_first_run(self) -> None:
+        from qmis.schema import bootstrap_database
+        from qmis.signals.regime import materialize_regime
+        from qmis.storage import connect_db
+
+        def feature_rows(ts: pd.Timestamp, *, gold_trend: str, oil_trend: str) -> pd.DataFrame:
+            return pd.DataFrame(
+                [
+                    {"ts": ts, "series_name": "gold", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": gold_trend},
+                    {"ts": ts, "series_name": "oil", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": oil_trend},
+                    {"ts": ts, "series_name": "yield_10y", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "copper", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "sp500", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "pmi", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "fed_balance_sheet", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "m2_money_supply", "pct_change_30d": 6.0, "pct_change_90d": 6.0, "pct_change_365d": 6.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts, "series_name": "reverse_repo_usage", "pct_change_30d": -6.0, "pct_change_90d": -6.0, "pct_change_365d": -6.0, "zscore_30d": -1.0, "volatility_30d": 0.1, "slope_30d": -1.0, "drawdown_90d": 0.0, "trend_label": "DOWN"},
+                    {"ts": ts, "series_name": "dollar_index", "pct_change_30d": -6.0, "pct_change_90d": -6.0, "pct_change_365d": -6.0, "zscore_30d": -1.0, "volatility_30d": 0.1, "slope_30d": -1.0, "drawdown_90d": 0.0, "trend_label": "DOWN"},
+                    {"ts": ts, "series_name": "vix", "pct_change_30d": 0.0, "pct_change_90d": 0.0, "pct_change_365d": 0.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                ]
+            )
+
+        def signal_rows(ts: pd.Timestamp, yield_10y: float, yield_3m: float) -> pd.DataFrame:
+            return pd.DataFrame(
+                [
+                    {"ts": ts, "source": "test", "category": "macro", "series_name": "yield_10y", "value": yield_10y, "unit": "percent", "metadata": "{}"},
+                    {"ts": ts, "source": "test", "category": "macro", "series_name": "yield_3m", "value": yield_3m, "unit": "percent", "metadata": "{}"},
+                ]
+            )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "qmis.duckdb"
+            bootstrap_database(db_path)
+            ts_one = pd.Timestamp("2026-03-08")
+            ts_two = pd.Timestamp("2026-03-09 12:15:00")
+            with connect_db(db_path) as connection:
+                for table_name, payload in (
+                    ("features", feature_rows(ts_one, gold_trend="UP", oil_trend="UP")),
+                    ("features", feature_rows(ts_two, gold_trend="DOWN", oil_trend="UP")),
+                    ("signals", signal_rows(ts_one, 4.2, 3.8)),
+                    ("signals", signal_rows(ts_two, 4.0, 4.3)),
+                    ("breadth_snapshots", pd.DataFrame([{"ts": ts_two, "breadth_score": 44.0, "breadth_state": "WEAKENING", "summary": "Breadth is weakening.", "components": "{}", "missing_inputs": "[]"}])),
+                    ("liquidity_snapshots", pd.DataFrame([{"ts": ts_two, "liquidity_score": 42.0, "liquidity_state": "TIGHTENING", "summary": "Liquidity is tightening.", "components": "{}", "missing_inputs": "[]"}])),
+                    ("stress_snapshots", pd.DataFrame([{"ts": ts_two, "stress_score": 61.0, "stress_level": "HIGH", "summary": "Stress is high.", "components": "{}", "missing_inputs": "[]"}])),
+                ):
+                    connection.register(f"{table_name}_df", payload)
+                    connection.execute(f"INSERT INTO {table_name} SELECT * FROM {table_name}_df")
+                    connection.unregister(f"{table_name}_df")
+
+            materialize_regime(db_path=db_path)
+
+            connection = duckdb.connect(str(db_path), read_only=True)
+            try:
+                persisted = connection.execute(
+                    "SELECT ts, inflation_score, growth_score, liquidity_score, risk_score FROM regimes ORDER BY ts"
+                ).fetchdf()
+            finally:
+                connection.close()
+
+        self.assertEqual(len(persisted), 2)
+        self.assertEqual(list(persisted["ts"].dt.strftime("%Y-%m-%d")), ["2026-03-08", "2026-03-09"])
+        self.assertNotEqual(
+            list(persisted.iloc[0][["inflation_score", "growth_score", "liquidity_score", "risk_score"]]),
+            list(persisted.iloc[1][["inflation_score", "growth_score", "liquidity_score", "risk_score"]]),
+        )
 
     def test_build_regime_probabilities_handles_mixed_signals(self) -> None:
         from qmis.signals.regime import build_regime_probabilities

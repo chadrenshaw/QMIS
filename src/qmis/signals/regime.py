@@ -31,6 +31,25 @@ SUPPORTED_REGIMES = (
     "STAGFLATION RISK",
 )
 
+SCORING_FEATURE_SERIES = (
+    "gold",
+    "oil",
+    "yield_10y",
+    "copper",
+    "sp500",
+    "pmi",
+    "fed_balance_sheet",
+    "m2_money_supply",
+    "reverse_repo_usage",
+    "dollar_index",
+    "vix",
+)
+
+SCORING_SIGNAL_SERIES = (
+    "yield_10y",
+    "yield_3m",
+)
+
 
 def determine_regime(scores: dict[str, int]) -> tuple[str, float]:
     """Map macro scores to a spec-defined regime label and bounded confidence."""
@@ -73,13 +92,16 @@ def determine_regime(scores: dict[str, int]) -> tuple[str, float]:
 def _build_latest_feature_snapshot(connection) -> pd.DataFrame:
     return connection.execute(
         """
-        WITH latest_features AS (
-            SELECT MAX(ts) AS latest_ts
+        SELECT ts, series_name, trend_label
+        FROM (
+            SELECT
+                ts,
+                series_name,
+                trend_label,
+                ROW_NUMBER() OVER (PARTITION BY series_name ORDER BY ts DESC) AS row_number
             FROM features
         )
-        SELECT ts, series_name, trend_label
-        FROM features
-        WHERE ts = (SELECT latest_ts FROM latest_features)
+        WHERE row_number = 1
         ORDER BY series_name
         """
     ).fetchdf()
@@ -107,6 +129,149 @@ def _build_signal_snapshot(connection, series_names: tuple[str, ...]) -> dict[st
         list(series_names),
     ).fetchdf()
     return {str(row["series_name"]): float(row["value"]) for _, row in frame.iterrows()}
+
+
+def _build_historical_regime_payload(connection, *, latest_ts: pd.Timestamp) -> pd.DataFrame:
+    latest_day = latest_ts.normalize()
+    feature_placeholders = ", ".join(["?"] * len(SCORING_FEATURE_SERIES))
+    signal_placeholders = ", ".join(["?"] * len(SCORING_SIGNAL_SERIES))
+
+    feature_history = connection.execute(
+        f"""
+        SELECT snapshot_day, series_name, trend_label
+        FROM (
+            SELECT
+                CAST(ts AS DATE) AS snapshot_day,
+                series_name,
+                trend_label,
+                ROW_NUMBER() OVER (
+                    PARTITION BY CAST(ts AS DATE), series_name
+                    ORDER BY ts DESC
+                ) AS row_number
+            FROM features
+            WHERE series_name IN ({feature_placeholders})
+        )
+        WHERE row_number = 1
+        ORDER BY snapshot_day ASC, series_name ASC
+        """,
+        list(SCORING_FEATURE_SERIES),
+    ).fetchdf()
+    if feature_history.empty:
+        return pd.DataFrame()
+
+    signal_history = connection.execute(
+        f"""
+        SELECT snapshot_day, series_name, value
+        FROM (
+            SELECT
+                CAST(ts AS DATE) AS snapshot_day,
+                series_name,
+                value,
+                ROW_NUMBER() OVER (
+                    PARTITION BY CAST(ts AS DATE), series_name
+                    ORDER BY ts DESC
+                ) AS row_number
+            FROM signals
+            WHERE series_name IN ({signal_placeholders})
+        )
+        WHERE row_number = 1
+        ORDER BY snapshot_day ASC, series_name ASC
+        """,
+        list(SCORING_SIGNAL_SERIES),
+    ).fetchdf()
+    existing_regime_days = connection.execute(
+        """
+        SELECT DISTINCT CAST(ts AS DATE) AS snapshot_day
+        FROM regimes
+        """
+    ).fetchdf()
+
+    feature_history["snapshot_day"] = pd.to_datetime(feature_history["snapshot_day"])
+    signal_history["snapshot_day"] = pd.to_datetime(signal_history["snapshot_day"])
+    existing_days = {
+        pd.Timestamp(day).normalize()
+        for day in existing_regime_days.get("snapshot_day", pd.Series(dtype="datetime64[ns]")).tolist()
+        if day is not None
+    }
+    timeline = sorted(
+        {
+            *feature_history["snapshot_day"].tolist(),
+            *signal_history["snapshot_day"].tolist(),
+        }
+    )
+    timeline = [day for day in timeline if day < latest_day and day.normalize() not in existing_days]
+    if not timeline:
+        return pd.DataFrame()
+
+    trend_panel = (
+        feature_history.pivot(index="snapshot_day", columns="series_name", values="trend_label")
+        .sort_index()
+        .reindex(timeline)
+        .ffill()
+    )
+    signal_panel = (
+        signal_history.pivot(index="snapshot_day", columns="series_name", values="value")
+        .sort_index()
+        .reindex(timeline)
+        .ffill()
+    )
+
+    def trend_flag(series_name: str, trend_label: str) -> pd.Series:
+        if series_name not in trend_panel:
+            return pd.Series(0, index=trend_panel.index, dtype="int64")
+        return trend_panel[series_name].eq(trend_label).astype("int64")
+
+    score_frame = pd.DataFrame(index=trend_panel.index)
+    score_frame["inflation_score"] = (
+        trend_flag("gold", "UP")
+        + trend_flag("oil", "UP")
+        + trend_flag("yield_10y", "UP")
+    )
+    score_frame["growth_score"] = (
+        trend_flag("copper", "UP")
+        + trend_flag("sp500", "UP")
+        + trend_flag("pmi", "UP")
+    )
+    score_frame["liquidity_score"] = (
+        trend_flag("fed_balance_sheet", "UP")
+        + trend_flag("m2_money_supply", "UP")
+        + trend_flag("reverse_repo_usage", "DOWN")
+        + trend_flag("dollar_index", "DOWN")
+    )
+
+    if {"yield_10y", "yield_3m"}.issubset(signal_panel.columns):
+        inverted_curve = signal_panel["yield_10y"].sub(signal_panel["yield_3m"]).le(0).fillna(False)
+    else:
+        inverted_curve = pd.Series(False, index=trend_panel.index)
+    score_frame["risk_score"] = (
+        trend_flag("vix", "UP")
+        + trend_flag("sp500", "DOWN")
+        + inverted_curve.astype("int64")
+    )
+
+    empty_json = json.dumps({}, sort_keys=True)
+    records: list[dict[str, Any]] = []
+    for snapshot_day, row in score_frame.iterrows():
+        score_payload = {
+            "inflation_score": int(row["inflation_score"]),
+            "growth_score": int(row["growth_score"]),
+            "liquidity_score": int(row["liquidity_score"]),
+            "risk_score": int(row["risk_score"]),
+        }
+        regime_label, confidence = determine_regime(score_payload)
+        records.append(
+            {
+                "ts": snapshot_day,
+                **score_payload,
+                "regime_label": regime_label,
+                "confidence": float(confidence),
+                "regime_probabilities": empty_json,
+                "regime_drivers": empty_json,
+                "bayesian_evidence": empty_json,
+                "forward_regime_forecast": empty_json,
+            }
+        )
+    return pd.DataFrame.from_records(records)
 
 
 def _load_latest_snapshot(connection, table_name: str, columns: str) -> dict[str, Any] | None:
@@ -177,11 +342,45 @@ def materialize_regime(db_path: Path | None = None) -> int:
     materialize_macro_pressure(db_path=target_path)
     with connect_db(target_path) as connection:
         feature_snapshot = _build_latest_feature_snapshot(connection)
-        connection.execute("DELETE FROM regimes")
         if feature_snapshot.empty:
             return 0
 
         latest_ts = pd.to_datetime(feature_snapshot["ts"]).max()
+        historical_payload = _build_historical_regime_payload(connection, latest_ts=latest_ts)
+        if not historical_payload.empty:
+            connection.register("historical_regimes_df", historical_payload)
+            connection.execute(
+                """
+                INSERT INTO regimes (
+                    ts,
+                    inflation_score,
+                    growth_score,
+                    liquidity_score,
+                    risk_score,
+                    regime_label,
+                    confidence,
+                    regime_probabilities,
+                    regime_drivers,
+                    bayesian_evidence,
+                    forward_regime_forecast
+                )
+                SELECT
+                    ts,
+                    inflation_score,
+                    growth_score,
+                    liquidity_score,
+                    risk_score,
+                    regime_label,
+                    confidence,
+                    regime_probabilities,
+                    regime_drivers,
+                    bayesian_evidence,
+                    forward_regime_forecast
+                FROM historical_regimes_df
+                """
+            )
+            connection.unregister("historical_regimes_df")
+        connection.execute("DELETE FROM regimes WHERE ts = ?", [latest_ts])
         signal_snapshot = _build_signal_snapshot(connection, ("yield_10y", "yield_3m"))
         scores = compute_macro_scores(feature_snapshot, signal_snapshot)
         score_payload = {

@@ -39,6 +39,7 @@ DASHBOARD_HISTORY_SERIES = (
 )
 
 SIGNAL_GROUP_ORDER = ("market", "breadth", "macro", "liquidity", "crypto", "astronomy", "natural")
+SCORE_HISTORY_LIMIT = 365
 
 CATEGORY_TITLES = {
     "market": "Market Signals",
@@ -295,9 +296,26 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
             """
             SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence,
                    regime_probabilities, regime_drivers, bayesian_evidence, forward_regime_forecast
-            FROM regimes
+            FROM (
+                SELECT
+                    ts,
+                    inflation_score,
+                    growth_score,
+                    liquidity_score,
+                    risk_score,
+                    regime_label,
+                    confidence,
+                    regime_probabilities,
+                    regime_drivers,
+                    bayesian_evidence,
+                    forward_regime_forecast
+                FROM regimes
+                ORDER BY ts DESC
+                LIMIT ?
+            )
             ORDER BY ts ASC
-            """
+            """,
+            [SCORE_HISTORY_LIMIT],
         ).fetchdf()
 
     trend_summary = {
