@@ -22,6 +22,8 @@ class QMISDeploymentAssetTests(unittest.TestCase):
         compose = compose_file.read_text(encoding="utf-8") if compose_file.exists() else ""
         woodpecker = woodpecker_file.read_text(encoding="utf-8") if woodpecker_file.exists() else ""
         deploy = deploy_script.read_text(encoding="utf-8") if deploy_script.exists() else ""
+        dockerfile_text = dockerfile.read_text(encoding="utf-8") if dockerfile.exists() else ""
+        entrypoint_text = entrypoint.read_text(encoding="utf-8") if entrypoint.exists() else ""
 
         self.assertTrue(dockerfile.exists())
         self.assertTrue(dockerignore.exists())
@@ -53,6 +55,19 @@ class QMISDeploymentAssetTests(unittest.TestCase):
         self.assertIn("DOCKER_HOST_SSH_KEY", woodpecker)
         self.assertIn("/srv/docker/qmis", readme)
         self.assertIn("infra-docker.zocalo.net", readme)
+        self.assertIn('ARG FRED_API_KEY=""', dockerfile_text)
+        self.assertIn('FRED_API_KEY="${FRED_API_KEY}"', dockerfile_text)
+        self.assertIn("set -a", entrypoint_text)
+        self.assertIn(". \"${APP_DIR}/.env.local\"", entrypoint_text)
+        self.assertLess(
+            entrypoint_text.index('log "starting uvicorn on ${HOST}:${PORT}"'),
+            entrypoint_text.index("bootstrap_once &"),
+        )
+        self.assertNotIn("FRED_API_KEY: ${FRED_API_KEY:-}", compose)
+        self.assertIn("- FRED_API_KEY", woodpecker)
+        self.assertIn("from_secret: FRED_API_KEY", woodpecker)
+        self.assertIn("The container now starts the web API immediately", readme)
+        self.assertIn("Published images bake in `FRED_API_KEY`", readme)
 
 
 if __name__ == "__main__":

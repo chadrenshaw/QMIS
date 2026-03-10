@@ -2,6 +2,12 @@
 set -eu
 
 APP_DIR="${QMIS_APP_DIR:-/app}"
+if [ -f "${APP_DIR}/.env.local" ]; then
+  set -a
+  . "${APP_DIR}/.env.local"
+  set +a
+fi
+
 DATA_ROOT="${QMIS_DATA_ROOT:-/var/lib/qmis}"
 HOST="${QMIS_HOST:-0.0.0.0}"
 PORT="${PORT:-8000}"
@@ -63,11 +69,21 @@ cleanup() {
 trap 'cleanup; exit 0' INT TERM
 trap cleanup EXIT
 
-if [ "${BOOTSTRAP_ON_START}" = "1" ]; then
+bootstrap_once() {
   run_job "collectors:market-15m bootstrap" uv run python "${APP_DIR}/scripts/run_collectors.py" --cadence market-15m || true
   run_job "collectors:daily bootstrap" uv run python "${APP_DIR}/scripts/run_collectors.py" --cadence daily || true
   run_job "analysis:daily bootstrap" uv run python "${APP_DIR}/scripts/run_analysis.py" --cadence daily || true
   run_job "alerts:daily bootstrap" uv run python "${APP_DIR}/scripts/run_alerts.py" --cadence daily || true
+}
+
+log "starting uvicorn on ${HOST}:${PORT}"
+uv run uvicorn qmis.api:app --host "${HOST}" --port "${PORT}" &
+api_pid=$!
+pids="${pids} ${api_pid}"
+
+if [ "${BOOTSTRAP_ON_START}" = "1" ]; then
+  bootstrap_once &
+  pids="${pids} $!"
 fi
 
 if [ "${ENABLE_SCHEDULER}" = "1" ]; then
@@ -87,11 +103,6 @@ if [ "${ENABLE_SCHEDULER}" = "1" ]; then
   run_loop "alerts:daily" "${DAILY_INTERVAL_SECONDS}" "${daily_initial_delay}" \
     uv run python "${APP_DIR}/scripts/run_alerts.py" --cadence daily
 fi
-
-log "starting uvicorn on ${HOST}:${PORT}"
-uv run uvicorn qmis.api:app --host "${HOST}" --port "${PORT}" &
-api_pid=$!
-pids="${pids} ${api_pid}"
 
 wait "${api_pid}"
 status=$?

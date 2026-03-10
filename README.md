@@ -79,17 +79,20 @@ Published image path:
 - `QMIS_ENABLE_SCHEDULER`
   `1` to run collector, analysis, and alert loops in-container.
 - `QMIS_BOOTSTRAP_ON_START`
-  `1` to run one startup pass before the steady-state schedule loops begin.
+  `1` to run one startup pass in the background while the API is already serving traffic.
 - `FRED_API_KEY`
-  Optional FRED API key for macro collectors.
+  Optional FRED API key for macro collectors. Published images bake this in from the Woodpecker `FRED_API_KEY` secret instead of expecting the remote Docker host to provide it at runtime.
 
 ### Build The Image
 
 ```bash
-docker build -t qmis:local .
+docker build \
+  --build-arg FRED_API_KEY="$(grep '^FRED_API_KEY=' .env.local | cut -d= -f2-)" \
+  -t qmis:local .
 ```
 
 The Dockerfile also accepts CI metadata build args so Woodpecker can stamp the image with the source repo URL and commit SHA.
+For local builds, the command above pulls `FRED_API_KEY` out of `.env.local` and bakes it into the image so the container does not depend on host-side runtime env injection.
 
 ### Run The Container
 
@@ -100,7 +103,6 @@ docker run --rm \
   -e QMIS_DATA_ROOT=/var/lib/qmis \
   -e QMIS_ENABLE_SCHEDULER=1 \
   -e QMIS_BOOTSTRAP_ON_START=1 \
-  -e FRED_API_KEY="${FRED_API_KEY:-}" \
   qmis:local
 ```
 
@@ -109,6 +111,8 @@ After startup:
 - API health: `http://localhost:8000/health`
 - browser dashboard: `http://localhost:8000/`
 
+The container now starts the web API immediately, then runs bootstrap collectors, analysis, and alerts in the background.
+
 ### Docker Compose
 
 ```bash
@@ -116,6 +120,7 @@ docker compose up
 ```
 
 The included [docker-compose.yml](/Users/crenshaw/Projects/QMIS/docker-compose.yml) defaults to pulling `gitea.chadlee.org/crenshaw/qmis:latest` and mounts `./runtime` into `/var/lib/qmis`, so DuckDB and logs survive container restarts.
+Published images bake in `FRED_API_KEY`, so the checked-in Compose file no longer expects the remote Docker host to export that secret at runtime.
 
 To run Compose against a locally built image instead of the published registry image:
 

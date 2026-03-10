@@ -11,6 +11,7 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS runtime
 
 ARG CI_REPO_URL="https://gitea.chadlee.org/crenshaw/QMIS"
 ARG CI_COMMIT_SHA="local"
+ARG FRED_API_KEY=""
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -19,6 +20,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH="/app/src" \
     QMIS_DATA_ROOT="/var/lib/qmis" \
     QMIS_WEB_DIST_DIR="/app/web/dist" \
+    FRED_API_KEY="${FRED_API_KEY}" \
     PORT="8000"
 
 WORKDIR /app
