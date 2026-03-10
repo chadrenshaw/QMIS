@@ -564,6 +564,110 @@ class QMISDashboardCLITests(unittest.TestCase):
         self.assertEqual(snapshot["intelligence"]["risk_monitor"]["divergence_risk"]["level"], "MODERATE")
         self.assertEqual(snapshot["intelligence"]["risk_monitor"]["systemic_risk"]["level"], "ELEVATED")
 
+    def test_load_dashboard_snapshot_recomputes_score_layer_when_regime_is_stale(self) -> None:
+        from qmis.dashboard.cli import load_dashboard_snapshot
+        from qmis.schema import bootstrap_database
+        from qmis.storage import connect_db
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "qmis.duckdb"
+            bootstrap_database(db_path)
+            ts_prev = pd.Timestamp("2026-03-08 00:00:00")
+            ts_latest = pd.Timestamp("2026-03-09 12:00:00")
+
+            signals = pd.DataFrame(
+                [
+                    {"ts": ts_prev, "source": "test", "category": "market", "series_name": "gold", "value": 2100.0, "unit": "usd", "metadata": "{}"},
+                    {"ts": ts_prev, "source": "test", "category": "market", "series_name": "oil", "value": 80.0, "unit": "usd", "metadata": "{}"},
+                    {"ts": ts_prev, "source": "test", "category": "market", "series_name": "copper", "value": 4.1, "unit": "usd", "metadata": "{}"},
+                    {"ts": ts_prev, "source": "test", "category": "market", "series_name": "sp500", "value": 6000.0, "unit": "index_points", "metadata": "{}"},
+                    {"ts": ts_prev, "source": "test", "category": "market", "series_name": "vix", "value": 18.0, "unit": "index_points", "metadata": "{}"},
+                    {"ts": ts_prev, "source": "test", "category": "macro", "series_name": "yield_10y", "value": 4.2, "unit": "percent", "metadata": "{}"},
+                    {"ts": ts_prev, "source": "test", "category": "macro", "series_name": "yield_3m", "value": 3.8, "unit": "percent", "metadata": "{}"},
+                    {"ts": ts_prev, "source": "test", "category": "macro", "series_name": "pmi", "value": 52.1, "unit": "index_points", "metadata": "{}"},
+                    {"ts": ts_prev, "source": "test", "category": "liquidity", "series_name": "fed_balance_sheet", "value": 7420.0, "unit": "usd_billions", "metadata": "{}"},
+                    {"ts": ts_prev, "source": "test", "category": "liquidity", "series_name": "m2_money_supply", "value": 21000.0, "unit": "usd_billions", "metadata": "{}"},
+                    {"ts": ts_prev, "source": "test", "category": "liquidity", "series_name": "reverse_repo_usage", "value": 500.0, "unit": "usd_billions", "metadata": "{}"},
+                    {"ts": ts_prev, "source": "test", "category": "market", "series_name": "dollar_index", "value": 101.0, "unit": "index_points", "metadata": "{}"},
+                    {"ts": ts_latest, "source": "test", "category": "market", "series_name": "gold", "value": 2200.0, "unit": "usd", "metadata": "{}"},
+                    {"ts": ts_latest, "source": "test", "category": "market", "series_name": "oil", "value": 84.0, "unit": "usd", "metadata": "{}"},
+                    {"ts": ts_latest, "source": "test", "category": "market", "series_name": "copper", "value": 4.4, "unit": "usd", "metadata": "{}"},
+                    {"ts": ts_latest, "source": "test", "category": "market", "series_name": "sp500", "value": 6200.0, "unit": "index_points", "metadata": "{}"},
+                    {"ts": ts_latest, "source": "test", "category": "market", "series_name": "vix", "value": 26.0, "unit": "index_points", "metadata": "{}"},
+                    {"ts": ts_latest, "source": "test", "category": "macro", "series_name": "yield_10y", "value": 4.3, "unit": "percent", "metadata": "{}"},
+                    {"ts": ts_latest, "source": "test", "category": "macro", "series_name": "yield_3m", "value": 3.9, "unit": "percent", "metadata": "{}"},
+                    {"ts": ts_latest, "source": "test", "category": "macro", "series_name": "pmi", "value": 53.5, "unit": "index_points", "metadata": "{}"},
+                    {"ts": ts_latest, "source": "test", "category": "liquidity", "series_name": "fed_balance_sheet", "value": 7480.0, "unit": "usd_billions", "metadata": "{}"},
+                    {"ts": ts_latest, "source": "test", "category": "liquidity", "series_name": "m2_money_supply", "value": 21250.0, "unit": "usd_billions", "metadata": "{}"},
+                    {"ts": ts_latest, "source": "test", "category": "liquidity", "series_name": "reverse_repo_usage", "value": 420.0, "unit": "usd_billions", "metadata": "{}"},
+                    {"ts": ts_latest, "source": "test", "category": "market", "series_name": "dollar_index", "value": 98.0, "unit": "index_points", "metadata": "{}"},
+                ]
+            )
+            features = pd.DataFrame(
+                [
+                    {"ts": ts_prev, "series_name": "gold", "pct_change_30d": -1.0, "pct_change_90d": -1.0, "pct_change_365d": -1.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                    {"ts": ts_prev, "series_name": "oil", "pct_change_30d": -1.0, "pct_change_90d": -1.0, "pct_change_365d": -1.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                    {"ts": ts_prev, "series_name": "yield_10y", "pct_change_30d": -1.0, "pct_change_90d": -1.0, "pct_change_365d": -1.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                    {"ts": ts_prev, "series_name": "copper", "pct_change_30d": -1.0, "pct_change_90d": -1.0, "pct_change_365d": -1.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                    {"ts": ts_prev, "series_name": "sp500", "pct_change_30d": -1.0, "pct_change_90d": -1.0, "pct_change_365d": -1.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                    {"ts": ts_prev, "series_name": "pmi", "pct_change_30d": -1.0, "pct_change_90d": -1.0, "pct_change_365d": -1.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                    {"ts": ts_prev, "series_name": "fed_balance_sheet", "pct_change_30d": -1.0, "pct_change_90d": -1.0, "pct_change_365d": -1.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                    {"ts": ts_prev, "series_name": "m2_money_supply", "pct_change_30d": -1.0, "pct_change_90d": -1.0, "pct_change_365d": -1.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                    {"ts": ts_prev, "series_name": "reverse_repo_usage", "pct_change_30d": 1.0, "pct_change_90d": 1.0, "pct_change_365d": 1.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                    {"ts": ts_prev, "series_name": "dollar_index", "pct_change_30d": 1.0, "pct_change_90d": 1.0, "pct_change_365d": 1.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                    {"ts": ts_prev, "series_name": "vix", "pct_change_30d": -1.0, "pct_change_90d": -1.0, "pct_change_365d": -1.0, "zscore_30d": 0.0, "volatility_30d": 0.1, "slope_30d": 0.0, "drawdown_90d": 0.0, "trend_label": "SIDEWAYS"},
+                    {"ts": ts_latest, "series_name": "gold", "pct_change_30d": 8.0, "pct_change_90d": 8.0, "pct_change_365d": 8.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts_latest, "series_name": "oil", "pct_change_30d": 8.0, "pct_change_90d": 8.0, "pct_change_365d": 8.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts_latest, "series_name": "yield_10y", "pct_change_30d": 8.0, "pct_change_90d": 8.0, "pct_change_365d": 8.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts_latest, "series_name": "copper", "pct_change_30d": 8.0, "pct_change_90d": 8.0, "pct_change_365d": 8.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts_latest, "series_name": "sp500", "pct_change_30d": -8.0, "pct_change_90d": -8.0, "pct_change_365d": -8.0, "zscore_30d": -1.0, "volatility_30d": 0.1, "slope_30d": -1.0, "drawdown_90d": 0.0, "trend_label": "DOWN"},
+                    {"ts": ts_latest, "series_name": "pmi", "pct_change_30d": 8.0, "pct_change_90d": 8.0, "pct_change_365d": 8.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts_latest, "series_name": "fed_balance_sheet", "pct_change_30d": 8.0, "pct_change_90d": 8.0, "pct_change_365d": 8.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts_latest, "series_name": "m2_money_supply", "pct_change_30d": 8.0, "pct_change_90d": 8.0, "pct_change_365d": 8.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                    {"ts": ts_latest, "series_name": "reverse_repo_usage", "pct_change_30d": -8.0, "pct_change_90d": -8.0, "pct_change_365d": -8.0, "zscore_30d": -1.0, "volatility_30d": 0.1, "slope_30d": -1.0, "drawdown_90d": 0.0, "trend_label": "DOWN"},
+                    {"ts": ts_latest, "series_name": "dollar_index", "pct_change_30d": -8.0, "pct_change_90d": -8.0, "pct_change_365d": -8.0, "zscore_30d": -1.0, "volatility_30d": 0.1, "slope_30d": -1.0, "drawdown_90d": 0.0, "trend_label": "DOWN"},
+                    {"ts": ts_latest, "series_name": "vix", "pct_change_30d": 8.0, "pct_change_90d": 8.0, "pct_change_365d": 8.0, "zscore_30d": 1.0, "volatility_30d": 0.1, "slope_30d": 1.0, "drawdown_90d": 0.0, "trend_label": "UP"},
+                ]
+            )
+            stale_regime = pd.DataFrame(
+                [
+                    {
+                        "ts": ts_prev,
+                        "inflation_score": 0,
+                        "growth_score": 0,
+                        "liquidity_score": 0,
+                        "risk_score": 0,
+                        "regime_label": "LIQUIDITY WITHDRAWAL",
+                        "confidence": 0.3,
+                        "regime_probabilities": "{}",
+                        "regime_drivers": "{}",
+                        "bayesian_evidence": "{}",
+                        "forward_regime_forecast": "{}",
+                    }
+                ]
+            )
+
+            with connect_db(db_path) as connection:
+                for table_name, payload in (("signals", signals), ("features", features), ("regimes", stale_regime)):
+                    connection.register(f"{table_name}_df", payload)
+                    connection.execute(f"INSERT INTO {table_name} SELECT * FROM {table_name}_df")
+                    connection.unregister(f"{table_name}_df")
+
+            snapshot = load_dashboard_snapshot(db_path=db_path)
+
+        self.assertEqual(
+            snapshot["scores"],
+            {
+                "inflation_score": 3,
+                "growth_score": 2,
+                "liquidity_score": 4,
+                "risk_score": 2,
+            },
+        )
+        self.assertEqual(len(snapshot["score_history"]), 2)
+        self.assertEqual(snapshot["score_history"][-1]["inflation_score"], 3)
+        self.assertEqual(snapshot["score_history"][-1]["liquidity_score"], 4)
+
     def test_render_dashboard_writes_required_sections(self) -> None:
         from qmis.alerts.engine import materialize_alerts
         from qmis.dashboard.cli import load_dashboard_snapshot, render_dashboard

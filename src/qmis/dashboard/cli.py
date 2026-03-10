@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -18,6 +19,7 @@ from qmis.signals.anomalies import detect_relationship_anomalies
 from qmis.signals.divergence import detect_cross_market_divergences
 from qmis.signals.interpreter import build_operator_snapshot
 from qmis.signals.persistence import annotate_factor_persistence
+from qmis.signals.scoring import compute_macro_scores
 from qmis.storage import connect_db, get_default_db_path
 
 
@@ -40,6 +42,20 @@ DASHBOARD_HISTORY_SERIES = (
 
 SIGNAL_GROUP_ORDER = ("market", "breadth", "macro", "liquidity", "crypto", "astronomy", "natural")
 SCORE_HISTORY_LIMIT = 365
+SCORE_FEATURE_SERIES = (
+    "gold",
+    "oil",
+    "yield_10y",
+    "copper",
+    "sp500",
+    "pmi",
+    "fed_balance_sheet",
+    "m2_money_supply",
+    "reverse_repo_usage",
+    "dollar_index",
+    "vix",
+)
+SCORE_SIGNAL_SERIES = ("yield_10y", "yield_3m")
 
 CATEGORY_TITLES = {
     "market": "Market Signals",
@@ -160,10 +176,126 @@ def _build_freshness(
     }
 
 
+def _compute_current_score_stack(
+    feature_rows: pd.DataFrame,
+    signal_summary: dict[str, dict[str, Any]],
+) -> dict[str, int]:
+    signal_snapshot = {
+        series_name: signal_summary.get(series_name, {}).get("value")
+        for series_name in SCORE_SIGNAL_SERIES
+    }
+    scores = compute_macro_scores(feature_rows, signal_snapshot)
+    return {
+        "inflation_score": int(scores["inflation_score"]),
+        "growth_score": int(scores["growth_score"]),
+        "liquidity_score": int(scores["liquidity_score"]),
+        "risk_score": int(scores["risk_score"]),
+    }
+
+
+def _build_score_history_from_features(
+    feature_history_rows: pd.DataFrame,
+    signal_history_rows: pd.DataFrame,
+) -> list[dict[str, Any]]:
+    if feature_history_rows.empty:
+        return []
+
+    feature_history = feature_history_rows.loc[
+        feature_history_rows["series_name"].isin(SCORE_FEATURE_SERIES)
+    ].copy()
+    if feature_history.empty:
+        return []
+    feature_history["snapshot_day"] = pd.to_datetime(feature_history["ts"]).dt.normalize()
+    feature_history = feature_history.sort_values(["snapshot_day", "series_name", "ts"])
+    feature_history = feature_history.drop_duplicates(["snapshot_day", "series_name"], keep="last")
+
+    signal_history = signal_history_rows.loc[
+        signal_history_rows["series_name"].isin(SCORE_SIGNAL_SERIES)
+    ].copy()
+    if not signal_history.empty:
+        signal_history["snapshot_day"] = pd.to_datetime(signal_history["ts"]).dt.normalize()
+        signal_history = signal_history.sort_values(["snapshot_day", "series_name", "ts"])
+        signal_history = signal_history.drop_duplicates(["snapshot_day", "series_name"], keep="last")
+
+    timeline = sorted(
+        {
+            *feature_history["snapshot_day"].tolist(),
+            *signal_history.get("snapshot_day", pd.Series(dtype="datetime64[ns]")).tolist(),
+        }
+    )
+    if not timeline:
+        return []
+
+    trend_panel = (
+        feature_history.pivot(index="snapshot_day", columns="series_name", values="trend_label")
+        .sort_index()
+        .reindex(timeline)
+        .ffill()
+    )
+    signal_panel = (
+        signal_history.pivot(index="snapshot_day", columns="series_name", values="value")
+        .sort_index()
+        .reindex(timeline)
+        .ffill()
+        if not signal_history.empty
+        else pd.DataFrame(index=timeline)
+    )
+
+    def trend_flag(series_name: str, expected_label: str) -> pd.Series:
+        if series_name not in trend_panel:
+            return pd.Series(0, index=trend_panel.index, dtype="int64")
+        return trend_panel[series_name].eq(expected_label).astype("int64")
+
+    if {"yield_10y", "yield_3m"}.issubset(signal_panel.columns):
+        inverted_curve = signal_panel["yield_10y"].sub(signal_panel["yield_3m"]).le(0).fillna(False)
+    else:
+        inverted_curve = pd.Series(False, index=trend_panel.index)
+
+    score_frame = pd.DataFrame(index=trend_panel.index)
+    score_frame["inflation_score"] = (
+        trend_flag("gold", "UP")
+        + trend_flag("oil", "UP")
+        + trend_flag("yield_10y", "UP")
+    )
+    score_frame["growth_score"] = (
+        trend_flag("copper", "UP")
+        + trend_flag("sp500", "UP")
+        + trend_flag("pmi", "UP")
+    )
+    score_frame["liquidity_score"] = (
+        trend_flag("fed_balance_sheet", "UP")
+        + trend_flag("m2_money_supply", "UP")
+        + trend_flag("reverse_repo_usage", "DOWN")
+        + trend_flag("dollar_index", "DOWN")
+    )
+    score_frame["risk_score"] = (
+        trend_flag("vix", "UP")
+        + trend_flag("sp500", "DOWN")
+        + inverted_curve.astype("int64")
+    )
+
+    return [
+        {
+            "ts": snapshot_day,
+            "inflation_score": int(row["inflation_score"]),
+            "growth_score": int(row["growth_score"]),
+            "liquidity_score": int(row["liquidity_score"]),
+            "risk_score": int(row["risk_score"]),
+            "regime_label": "",
+            "confidence": 0.0,
+            "regime_probabilities": {},
+            "regime_drivers": {},
+            "bayesian_evidence": {},
+            "forward_regime_forecast": {},
+        }
+        for snapshot_day, row in score_frame.iterrows()
+    ][-SCORE_HISTORY_LIMIT:]
+
+
 def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
     """Load the latest derived dashboard state from DuckDB."""
     target_path = bootstrap_database(db_path or get_default_db_path())
-    with connect_db(target_path, read_only=True) as connection:
+    with connect_db(target_path) as connection:
         feature_rows = connection.execute(
             """
             SELECT ts, series_name, trend_label
@@ -291,6 +423,24 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
             ORDER BY series_name, ts ASC
             """,
             list(DASHBOARD_HISTORY_SERIES),
+        ).fetchdf()
+        historical_feature_rows = connection.execute(
+            f"""
+            SELECT ts, series_name, trend_label
+            FROM features
+            WHERE series_name IN ({", ".join(["?"] * len(SCORE_FEATURE_SERIES))})
+            ORDER BY ts ASC, series_name ASC
+            """,
+            list(SCORE_FEATURE_SERIES),
+        ).fetchdf()
+        historical_score_signals = connection.execute(
+            f"""
+            SELECT ts, series_name, value
+            FROM signals
+            WHERE series_name IN ({", ".join(["?"] * len(SCORE_SIGNAL_SERIES))})
+            ORDER BY ts ASC, series_name ASC
+            """,
+            list(SCORE_SIGNAL_SERIES),
         ).fetchdf()
         score_history_rows = connection.execute(
             """
@@ -431,7 +581,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         latest_regime["regime_drivers"] = _parse_metadata(latest_regime.get("regime_drivers"))
         latest_regime["bayesian_evidence"] = _parse_metadata(latest_regime.get("bayesian_evidence"))
         latest_regime["forward_regime_forecast"] = _parse_metadata(latest_regime.get("forward_regime_forecast"))
-    scores = (
+    persisted_scores = (
         {
             "inflation_score": int(latest_regime["inflation_score"]),
             "growth_score": int(latest_regime["growth_score"]),
@@ -441,6 +591,7 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         if latest_regime
         else {}
     )
+    computed_scores = _compute_current_score_stack(feature_rows, signal_summary)
 
     yield_10y = signal_summary.get("yield_10y", {}).get("value")
     yield_3m = signal_summary.get("yield_3m", {}).get("value")
@@ -483,6 +634,10 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         }
         for _, row in score_history_rows.iterrows()
     ]
+    derived_score_history = _build_score_history_from_features(
+        historical_feature_rows,
+        historical_score_signals,
+    )
     signal_groups = {
         category: [
             series_name
@@ -535,6 +690,17 @@ def load_dashboard_snapshot(db_path: Path | None = None) -> dict[str, Any]:
         default=None,
     )
     alert_rows, alert_summary = load_alert_snapshot(db_path=target_path)
+
+    latest_feature_ts = feature_rows["ts"].max() if not feature_rows.empty else None
+    latest_regime_ts = regime_rows["ts"].max() if not regime_rows.empty else None
+    scores_are_stale = (
+        latest_feature_ts is not None
+        and latest_regime_ts is not None
+        and pd.to_datetime(latest_regime_ts) < pd.to_datetime(latest_feature_ts)
+    )
+    scores = computed_scores if (not persisted_scores or scores_are_stale) else persisted_scores
+    if len(score_history) < 2 or scores_are_stale:
+        score_history = derived_score_history
 
     snapshot = {
         "trend_summary": trend_summary,

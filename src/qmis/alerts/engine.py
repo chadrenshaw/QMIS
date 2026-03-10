@@ -84,7 +84,7 @@ def _latest_macro_pressure(connection) -> dict[str, Any] | None:
 def load_alert_snapshot(db_path: Path | None = None) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Load the persisted alert snapshot and a summary view."""
     target_path = bootstrap_database(db_path or get_default_db_path())
-    with connect_db(target_path, read_only=True) as connection:
+    with connect_db(target_path) as connection:
         alerts = connection.execute(
             """
             SELECT

@@ -325,6 +325,22 @@ class QMISAPITests(unittest.TestCase):
         self.assertEqual(health.status_code, 200)
         self.assertEqual(health.json()["status"], "ok")
 
+    def test_dashboard_endpoint_succeeds_while_write_connection_is_open(self) -> None:
+        from qmis.api import create_app
+        from qmis.storage import connect_db
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "qmis.duckdb"
+            self._seed_state(db_path)
+            client = TestClient(create_app(db_path=db_path))
+
+            with connect_db(db_path) as held_connection:
+                dashboard = client.get("/dashboard")
+                self.assertIsNotNone(held_connection)
+
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertIn("scores", dashboard.json())
+
 
 if __name__ == "__main__":
     unittest.main()

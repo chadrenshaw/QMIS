@@ -29,7 +29,7 @@ def _serialize_record(record: dict[str, Any]) -> dict[str, Any]:
 
 
 def _fetch_latest_signals(db_path: Path) -> dict[str, dict[str, Any]]:
-    with connect_db(db_path, read_only=True) as connection:
+    with connect_db(db_path) as connection:
         rows = connection.execute(
             """
             SELECT ts, series_name, value, unit, category, source
@@ -64,7 +64,7 @@ def _fetch_latest_signals(db_path: Path) -> dict[str, dict[str, Any]]:
 
 
 def _fetch_latest_regime(db_path: Path) -> dict[str, Any] | None:
-    with connect_db(db_path, read_only=True) as connection:
+    with connect_db(db_path) as connection:
         rows = connection.execute(
             """
             SELECT ts, inflation_score, growth_score, liquidity_score, risk_score, regime_label, confidence,
@@ -86,7 +86,7 @@ def _fetch_latest_regime(db_path: Path) -> dict[str, Any] | None:
 
 
 def _fetch_relationships(db_path: Path) -> list[dict[str, Any]]:
-    with connect_db(db_path, read_only=True) as connection:
+    with connect_db(db_path) as connection:
         rows = connection.execute(
             """
             SELECT
@@ -107,7 +107,7 @@ def _fetch_relationships(db_path: Path) -> list[dict[str, Any]]:
 
 
 def _fetch_anomalies(db_path: Path) -> list[dict[str, Any]]:
-    with connect_db(db_path, read_only=True) as connection:
+    with connect_db(db_path) as connection:
         rows = connection.execute(
             """
             SELECT
@@ -130,7 +130,7 @@ def _fetch_anomalies(db_path: Path) -> list[dict[str, Any]]:
 
 
 def _fetch_divergences(db_path: Path) -> list[dict[str, Any]]:
-    with connect_db(db_path, read_only=True) as connection:
+    with connect_db(db_path) as connection:
         relationships = connection.execute(
             """
             SELECT
