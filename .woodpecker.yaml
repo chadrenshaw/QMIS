@@ -13,19 +13,27 @@ steps:
       - npm test -- --run
       - npm run build
 
+  prepare-build-env:
+    image: alpine:3.21
+    environment:
+      FRED_API_KEY:
+        from_secret: FRED_API_KEY
+    commands:
+      - mkdir -p .ci
+      - printf 'FRED_API_KEY=%s\n' "${FRED_API_KEY:-}" > .ci/build.env
+
   verify-container-build:
     image: woodpeckerci/plugin-docker-buildx
     depends_on:
       - backend-tests
       - frontend-tests-and-build
-    environment:
-      FRED_API_KEY:
-        from_secret: FRED_API_KEY
+      - prepare-build-env
     settings:
       registry: gitea.chadlee.org
       repo: gitea.chadlee.org/${CI_REPO_OWNER}/qmis
       dockerfile: Dockerfile
       dry_run: true
+      env_file: .ci/build.env
       build_args_from_env:
         - CI_REPO_URL
         - CI_COMMIT_SHA
@@ -40,13 +48,11 @@ steps:
     image: woodpeckerci/plugin-docker-buildx
     depends_on:
       - verify-container-build
-    environment:
-      FRED_API_KEY:
-        from_secret: FRED_API_KEY
     settings:
       registry: gitea.chadlee.org
       repo: gitea.chadlee.org/${CI_REPO_OWNER}/qmis
       dockerfile: Dockerfile
+      env_file: .ci/build.env
       username:
         from_secret: REGISTRY_USER
       password:
@@ -67,13 +73,11 @@ steps:
     image: woodpeckerci/plugin-docker-buildx
     depends_on:
       - verify-container-build
-    environment:
-      FRED_API_KEY:
-        from_secret: FRED_API_KEY
     settings:
       registry: gitea.chadlee.org
       repo: gitea.chadlee.org/${CI_REPO_OWNER}/qmis
       dockerfile: Dockerfile
+      env_file: .ci/build.env
       username:
         from_secret: REGISTRY_USER
       password:
@@ -94,13 +98,11 @@ steps:
     image: woodpeckerci/plugin-docker-buildx
     depends_on:
       - verify-container-build
-    environment:
-      FRED_API_KEY:
-        from_secret: FRED_API_KEY
     settings:
       registry: gitea.chadlee.org
       repo: gitea.chadlee.org/${CI_REPO_OWNER}/qmis
       dockerfile: Dockerfile
+      env_file: .ci/build.env
       username:
         from_secret: REGISTRY_USER
       password:

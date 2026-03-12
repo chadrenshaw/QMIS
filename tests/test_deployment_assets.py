@@ -64,6 +64,8 @@ class QMISDeploymentAssetTests(unittest.TestCase):
             entrypoint_text.index("bootstrap_once &"),
         )
         self.assertNotIn("FRED_API_KEY: ${FRED_API_KEY:-}", compose)
+        self.assertIn("prepare-build-env:", woodpecker)
+        self.assertIn("env_file: .ci/build.env", woodpecker)
         self.assertIn("- FRED_API_KEY", woodpecker)
         self.assertIn("from_secret: FRED_API_KEY", woodpecker)
         self.assertIn("The container now starts the web API immediately", readme)
